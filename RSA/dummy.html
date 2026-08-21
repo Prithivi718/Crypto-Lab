@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSA Algorithm Implementation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            background-color: #fafafa;
+        }
+        .input-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        label {
+            font-weight: bold;
+        }
+        input[type="number"], input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 120px;
+        }
+        input[type="text"].full-width {
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            background-color: #2980b9;
+            color: white;
+            transition: 0.2s;
+        }
+        button:hover {
+            background-color: #1f6391;
+        }
+        .output {
+            margin-top: 15px;
+            padding: 12px;
+            background: #eef7fc;
+            border-left: 5px solid #2980b9;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .error {
+            color: #d9534f;
+            background: #fdf7f7;
+            border-left-color: #d9534f;
+        }
+        .success {
+            color: #27ae60;
+            background: #eafaf1;
+            border-left-color: #27ae60;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>RSA Key Generation & Cipher</h1>
+
+    <div class="section">
+        <h2>1. Key Generation</h2>
+        <div class="input-group">
+            <label for="primeP">Prime (p):</label>
+            <input type="number" id="primeP" value="61">
+
+            <label for="primeQ">Prime (q):</label>
+            <input type="number" id="primeQ" value="53">
+
+            <button onclick="generateKeys()">Generate Keys</button>
+        </div>
+        <div id="keyOutput" class="output">Click "Generate Keys" to calculate n, φ(n), e, and d.</div>
+    </div>
+
+    <div class="section">
+        <h2>2. Encryption</h2>
+        <div class="input-group">
+            <label for="plaintext">Message (Text):</label>
+            <input type="text" id="plaintext" class="full-width" value="HELLO">
+        </div>
+        <button onclick="encryptMessage()">Encrypt Message</button>
+        <div id="encryptOutput" class="output">Encrypted ciphertext will appear here.</div>
+    </div>
+
+    <div class="section">
+        <h2>3. Decryption</h2>
+        <button onclick="decryptMessage()">Decrypt Ciphertext</button>
+        <div id="decryptOutput" class="output">Decrypted plaintext will appear here.</div>
+    </div>
+</div>
+
+<script>
+    // Global Key Variables
+    let n, phi, e, d;
+    let encryptedArray = [];
+
+    // Helper: GCD Calculation
+    function gcd(a, b) {
+        while (b !== 0n) {
+            let temp = b;
+            b = a % b;
+            a = temp;
+        }
+        return a;
+    }
+
+    // Helper: Extended Euclidean Algorithm for Modular Inverse
+    function modInverse(e, phi) {
+        let m0 = phi;
+        let y = 0n, x = 1n;
+
+        if (phi === 1n) return 0n;
+
+        while (e > 1n) {
+            let q = e / phi;
+            let t = phi;
+
+            phi = e % phi;
+            e = t;
+            t = y;
+
+            y = x - q * y;
+            x = t;
+        }
+
+        if (x < 0n) x += m0;
+
+        return x;
+    }
+
+    // Helper: Primality Check
+    function isPrime(num) {
+        if (num <= 1n) return false;
+        if (num <= 3n) return true;
+        if (num % 2n === 0n || num % 3n === 0n) return false;
+        for (let i = 5n; i * i <= num; i += 6n) {
+            if (num % i === 0n || num % (i + 2n) === 0n) return false;
+        }
+        return true;
+    }
+
+    // Modular Exponentiation: (base^exp) % mod
+    function powerMod(base, exp, mod) {
+        let res = 1n;
+        base = base % mod;
+        while (exp > 0n) {
+            if (exp % 2n === 1n) res = (res * base) % mod;
+            base = (base * base) % mod;
+            exp = exp / 2n;
+        }
+        return res;
+    }
+
+    // Step 1: Key Generation Process
+    function generateKeys() {
+        const pInput = document.getElementById('primeP').value;
+        const qInput = document.getElementById('primeQ').value;
+        const keyOutput = document.getElementById('keyOutput');
+
+        const p = BigInt(pInput);
+        const q = BigInt(qInput);
+
+        if (!isPrime(p) || !isPrime(q)) {
+            keyOutput.className = "output error";
+            keyOutput.innerHTML = "Error: Both 'p' and 'q' must be prime numbers!";
+            return;
+        }
+
+        if (p === q) {
+            keyOutput.className = "output error";
+            keyOutput.innerHTML = "Error: 'p' and 'q' must be distinct prime numbers!";
+            return;
+        }
+
+        // Calculate n and phi
+        n = p * q;
+        phi = (p - 1n) * (q - 1n);
+
+        // Find standard e such that 1 < e < phi and gcd(e, phi) == 1
+        e = 65537n; // Commonly used e
+        if (e >= phi || gcd(e, phi) !== 1n) {
+            e = 3n;
+            while (gcd(e, phi) !== 1n) {
+                e += 2n;
+            }
+        }
+
+        // Calculate private key d
+        d = modInverse(e, phi);
+
+        keyOutput.className = "output success";
+        keyOutput.innerHTML = 
+`Step-by-Step Key Generation:
+---------------------------------
+1. Modulus (n) = p * q = ${p} * ${q} = ${n}
+2. Euler's Totient φ(n) = (p-1)*(q-1) = ${phi}
+3. Public Key exponent (e) = ${e}  (where gcd(e, φ(n)) = 1)
+4. Private Key exponent (d) = ${d}  (where (d * e) % φ(n) = 1)
+
+Keys Ready!
+Public Key  (e, n) = (${e}, ${n})
+Private Key (d, n) = (${d}, ${n})`;
+    }
+
+    // Step 2: Encryption Process
+    function encryptMessage() {
+        const text = document.getElementById('plaintext').value;
+        const encryptOutput = document.getElementById('encryptOutput');
+
+        if (!n || !e) {
+            encryptOutput.className = "output error";
+            encryptOutput.innerHTML = "Please generate RSA keys first!";
+            return;
+        }
+
+        if (text.length === 0) {
+            encryptOutput.className = "output error";
+            encryptOutput.innerHTML = "Please enter a message to encrypt!";
+            return;
+        }
+
+        encryptedArray = [];
+        let details = "Encryption Process:\n-------------------\n";
+
+        for (let i = 0; i < text.length; i++) {
+            let charCode = BigInt(text.charCodeAt(i));
+
+            if (charCode >= n) {
+                encryptOutput.className = "output error";
+                encryptOutput.innerHTML = `Error: Character code (${charCode}) exceeds modulus n (${n}). Use larger prime numbers!`;
+                return;
+            }
+
+            // Formula: C = (M^e) % n
+            let cipherNum = powerMod(charCode, e, n);
+            encryptedArray.push(cipherNum);
+
+            details += `'${text[i]}' (ASCII: ${charCode})  -->  (${charCode}^${e}) mod ${n} = ${cipherNum}\n`;
+        }
+
+        encryptOutput.className = "output success";
+        encryptOutput.innerHTML = details + `\nFinal Ciphertext Array: [${encryptedArray.join(", ")}]`;
+    }
+
+    // Step 3: Decryption Process
+    function decryptMessage() {
+        const decryptOutput = document.getElementById('decryptOutput');
+
+        if (!n || !d) {
+            decryptOutput.className = "output error";
+            decryptOutput.innerHTML = "Please generate RSA keys first!";
+            return;
+        }
+
+        if (encryptedArray.length === 0) {
+            decryptOutput.className = "output error";
+            decryptOutput.innerHTML = "No ciphertext found! Encrypt a message first.";
+            return;
+        }
+
+        let decryptedText = "";
+        let details = "Decryption Process:\n-------------------\n";
+
+        for (let i = 0; i < encryptedArray.length; i++) {
+            let cipherNum = encryptedArray[i];
+
+            // Formula: M = (C^d) % n
+            let plainNum = powerMod(cipherNum, d, n);
+            let char = String.fromCharCode(Number(plainNum));
+            decryptedText += char;
+
+            details += `Cipher Block ${cipherNum}  -->  (${cipherNum}^${d}) mod ${n} = ${plainNum} (Char: '${char}')\n`;
+        }
+
+        decryptOutput.className = "output success";
+        decryptOutput.innerHTML = details + `\nDecrypted Plaintext: "${decryptedText}"`;
+    }
+
+    // Auto-generate keys on page load
+    window.onload = generateKeys;
+</script>
+
+</body>
+</html>

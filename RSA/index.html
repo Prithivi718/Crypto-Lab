@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RSA Encryption & Decryption</title>
+    <link rel="icon" href="PRITHIVI.png">
+</head>
+<body style="margin:0; padding:0; font-family: monospace; background:#f4f7fb; color:#222;">
+
+    <div style="max-width:900px; margin:40px auto; padding:20px;">
+
+        <h1 style="text-align:center; margin-bottom:25px; color:#1f3c88;">
+            RSA Encryption & Decryption Demo
+        </h1>
+
+        <!-- Key Generation -->
+        <div style="background:#fff; border:1px solid #d9e2ef; border-radius:12px; padding:20px; margin-bottom:20px; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+            <h2 style="margin-top:0; color:#2b4c7e;">1. Key Generation</h2>
+
+            <div style="display:flex; flex-wrap:wrap; gap:15px; align-items:center; margin-bottom:15px;">
+                <div style="flex:1; min-width:200px;">
+                    <label for="primeP" style="display:block; margin-bottom:6px; font-weight:bold;">Prime (p)</label>
+                    <input type="number" id="primeP" value="61"
+                        style="width:100%; padding:10px 12px; border:1px solid #c7d2e3; border-radius:8px; font-size:14px; box-sizing:border-box;">
+                </div>
+
+                <div style="flex:1; min-width:200px;">
+                    <label for="primeQ" style="display:block; margin-bottom:6px; font-weight:bold;">Prime (q)</label>
+                    <input type="number" id="primeQ" value="53"
+                        style="width:100%; padding:10px 12px; border:1px solid #c7d2e3; border-radius:8px; font-size:14px; box-sizing:border-box;">
+                </div>
+
+                <div style="align-self:end;">
+                    <button onclick="generateKeys()"
+                        style="padding:11px 18px; border:none; border-radius:8px; background:#1f3c88; color:#fff; font-weight:bold; cursor:pointer;">
+                        Generate Keys
+                    </button>
+                </div>
+            </div>
+
+            <div id="keyOutput"
+                style="padding:14px; border-radius:8px; background:#f8fbff; border:1px dashed #b9c9e5; min-height:55px; line-height:1.6;">
+                Click "Generate Keys" to calculate n, φ(n), e, and d.
+            </div>
+        </div>
+
+        <!-- Encryption -->
+        <div style="background:#fff; border:1px solid #d9e2ef; border-radius:12px; padding:20px; margin-bottom:20px; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+            <h2 style="margin-top:0; color:#2b4c7e;">2. Encryption</h2>
+
+            <div style="margin-bottom:15px;">
+                <label for="plaintext" style="display:block; margin-bottom:6px; font-weight:bold;">
+                    Message (Text or Number)
+                </label>
+                <input type="text" id="plaintext" value="HELLO" placeholder="Enter text like HELLO or number like 8"
+                    style="width:100%; padding:10px 12px; border:1px solid #c7d2e3; border-radius:8px; font-size:14px; box-sizing:border-box;">
+            </div>
+
+            <button onclick="encryptMessage()"
+                style="padding:11px 18px; border:none; border-radius:8px; background:#2e7d32; color:#fff; font-weight:bold; cursor:pointer; margin-bottom:15px;">
+                Encrypt Message
+            </button>
+
+            <div id="encryptOutput"
+                style="padding:14px; border-radius:8px; background:#f8fbff; border:1px dashed #b9c9e5; min-height:55px; line-height:1.6;">
+                Encrypted ciphertext will appear here.
+            </div>
+        </div>
+
+        <!-- Decryption -->
+        <div style="background:#fff; border:1px solid #d9e2ef; border-radius:12px; padding:20px; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+            <h2 style="margin-top:0; color:#2b4c7e;">3. Decryption</h2>
+
+            <p style="margin-top:0; color:#555; line-height:1.6;">
+                Click the button below to decrypt the last ciphertext generated.
+                If no ciphertext is stored, the program will ask for manual input.
+            </p>
+
+            <button onclick="decryptMessage()"
+                style="padding:11px 18px; border:none; border-radius:8px; background:#c62828; color:#fff; font-weight:bold; cursor:pointer; margin-bottom:15px;">
+                Decrypt Ciphertext
+            </button>
+
+            <div id="decryptOutput"
+                style="padding:14px; border-radius:8px; background:#f8fbff; border:1px dashed #b9c9e5; min-height:55px; line-height:1.6;">
+                Decrypted plaintext will appear here.
+            </div>
+        </div>
+
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
