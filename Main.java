@@ -19,6 +19,5 @@ public class Main {
         HillCipher.demo(secret);
 
         scr.close();
-
     }
 }
