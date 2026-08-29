@@ -15,7 +15,7 @@ public class DiffieHellman {
             throw new IllegalArgumentException("q is too small. Use a larger prime number.");
         }
 
-        BigInteger range = upper.subtract(lower).add(BigInteger.ONE);
+        // BigInteger range = upper.subtract(lower).add(BigInteger.ONE);
         BigInteger secret;
 
         do {

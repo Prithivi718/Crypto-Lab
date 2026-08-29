@@ -26,18 +26,17 @@ public class PlayfairCipher {
             }
         }
 
-	System.out.println("Key Matrix:");   
+        System.out.println("Key Matrix:");
 
+        for (int i = 0; i < matrix.length; i++) {
+            for (int j = 0; j < matrix.length; j++) {
 
-	for (int i=0; i < matrix.length; i++){
-	   for (int j=0; j < matrix.length; j++){
-		
-		System.out.print(matrix[i][j]);   
-	
-	   }
-	   System.out.println();   
- 
-	}
+                System.out.print(matrix[i][j]);
+
+            }
+            System.out.println();
+
+        }
 
         return matrix;
     }
@@ -45,7 +44,8 @@ public class PlayfairCipher {
     // Find position of character
     private static int[] find(char[][] matrix, char ch) {
 
-        if (ch == 'J') ch = 'I';
+        if (ch == 'J')
+            ch = 'I';
 
         for (int i = 0; i < 5; i++) {
 
@@ -53,7 +53,7 @@ public class PlayfairCipher {
 
                 if (matrix[i][j] == ch) {
 
-                    return new int[]{i, j};
+                    return new int[] { i, j };
                 }
             }
         }
@@ -90,17 +90,17 @@ public class PlayfairCipher {
             int[] p1 = find(matrix, a);
             int[] p2 = find(matrix, b);
 
-            if (p1[0] == p2[0]) {          // Same row
+            if (p1[0] == p2[0]) { // Same row
 
                 result.append(matrix[p1[0]][(p1[1] + shift + 5) % 5]);
                 result.append(matrix[p2[0]][(p2[1] + shift + 5) % 5]);
 
-            } else if (p1[1] == p2[1]) {   // Same column
+            } else if (p1[1] == p2[1]) { // Same column
 
                 result.append(matrix[(p1[0] + shift + 5) % 5][p1[1]]);
                 result.append(matrix[(p2[0] + shift + 5) % 5][p2[1]]);
 
-            } else {                        // Rectangle
+            } else { // Rectangle
 
                 result.append(matrix[p1[0]][p2[1]]);
                 result.append(matrix[p2[0]][p1[1]]);
@@ -121,18 +121,19 @@ public class PlayfairCipher {
     }
 
     public static void demo(String secret) {
-	Scanner scr = new Scanner(System.in);
+        Scanner scr = new Scanner(System.in);
 
         System.out.println("\n=== PLAYFAIR CIPHER ===");
 
-	System.out.println("Enter the key string: ");
-	String key = scr.nextLine().toUpperCase();
+        System.out.println("Enter the key string: ");
+        String key = scr.nextLine().toUpperCase();
 
         String encrypted = encrypt(secret, key);
 
         System.out.println("Plain Text : " + secret);
         System.out.println("Cipher Text: " + encrypted);
-        System.out.println("Decrypted  : " +
-                decrypt(encrypted, key));
+        System.out.println("Decrypted  : " + decrypt(encrypted, key));
+
+        scr.close();
     }
 }

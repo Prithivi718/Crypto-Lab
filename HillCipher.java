@@ -1,8 +1,6 @@
 import java.util.*;
 
-
 class HillCipher {
-
 
     // Encrypt plaintext
     public static String encrypt(String text, int[][] key) {
@@ -35,31 +33,32 @@ class HillCipher {
     // Decrypt ciphertext
     public static String decrypt(String text, int[][] key) {
 
-        // Calculate determinant 
-	int det = (key[0][0] * key[1][1] - key[0][1] * key[1][0]) % 26; 
-	if (det < 0) det += 26;
-	// Find determinant inverse 
-	int detInv = -1; 
-	for (int i = 1; i < 26; i++) {
-	   if ((det * i) % 26 == 1) { 
-	      detInv = i; 
-	      break; 
-	   }
-        } 
+        // Calculate determinant
+        int det = (key[0][0] * key[1][1] - key[0][1] * key[1][0]) % 26;
+        if (det < 0)
+            det += 26;
+        // Find determinant inverse
+        int detInv = -1;
+        for (int i = 1; i < 26; i++) {
+            if ((det * i) % 26 == 1) {
+                detInv = i;
+                break;
+            }
+        }
 
-	System.out.println("Determinant Inverse = " + detInv);	
+        System.out.println("Determinant Inverse = " + detInv);
 
-	if (detInv == -1) {
-	  System.out.println("Key Matrix is not invertible!"); 
-	  return ""; 
-	} 
+        if (detInv == -1) {
+            System.out.println("Key Matrix is not invertible!");
+            return "";
+        }
 
-	// Build inverse matrix 
-	int[][] inverseKey = new int[2][2];
-	inverseKey[0][0] = (key[1][1] * detInv) % 26; 
-	inverseKey[0][1] = (-key[0][1] * detInv + 26) % 26; 
-	inverseKey[1][0] = (-key[1][0] * detInv + 26) % 26; 
-	inverseKey[1][1] = (key[0][0] * detInv) % 26;
+        // Build inverse matrix
+        int[][] inverseKey = new int[2][2];
+        inverseKey[0][0] = (key[1][1] * detInv) % 26;
+        inverseKey[0][1] = (-key[0][1] * detInv + 26) % 26;
+        inverseKey[1][0] = (-key[1][0] * detInv + 26) % 26;
+        inverseKey[1][1] = (key[0][0] * detInv) % 26;
 
         StringBuilder plain = new StringBuilder();
 
@@ -84,14 +83,14 @@ class HillCipher {
     // Demo function
     public static void demo(String secret) {
 
-	Scanner sc = new Scanner(System.in); 
-	int[][] key = new int[2][2];
-	System.out.println("Enter 2x2 Key Matrix:"); 
-	for (int i = 0; i < 2; i++) { 
-	  for (int j = 0; j < 2; j++) { 
-	    key[i][j] = sc.nextInt(); 
-	  }
-	}
+        Scanner sc = new Scanner(System.in);
+        int[][] key = new int[2][2];
+        System.out.println("Enter 2x2 Key Matrix:");
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+                key[i][j] = sc.nextInt();
+            }
+        }
 
         System.out.println("\n=== HILL CIPHER ===");
 
@@ -103,5 +102,7 @@ class HillCipher {
         String decrypted = decrypt(encrypted, key);
 
         System.out.println("Decrypted  : " + decrypted);
+
+        sc.close();
     }
 }

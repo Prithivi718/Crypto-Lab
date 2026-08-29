@@ -60,8 +60,8 @@ public class VigenereCipher {
     public static void demo(String secret) {
 
         Scanner scr = new Scanner(System.in);
-	System.out.println("Enter KEY string: ");
-	String key = scr.nextLine();
+        System.out.println("Enter KEY string: ");
+        String key = scr.nextLine();
 
         System.out.println("\n== VIGENERE CIPHER ===");
 
@@ -74,5 +74,7 @@ public class VigenereCipher {
         String decrypted = decrypt(encrypted, key);
 
         System.out.println("Decrypted  : " + decrypted);
+
+        scr.close();
     }
 }

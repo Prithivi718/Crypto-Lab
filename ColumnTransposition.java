@@ -9,7 +9,7 @@ public class ColumnTransposition {
         // // Column numbers
         // System.out.print("Column : ");
         // for (int i = 0; i < key.length; i++)
-        //     System.out.printf("%-3d", i + 1);
+        // System.out.printf("%-3d", i + 1);
         System.out.println();
 
         // Key values
@@ -31,7 +31,7 @@ public class ColumnTransposition {
         // // Ordered column numbers
         // System.out.print("Column : ");
         // for (int col : order)
-        //     System.out.printf("%-3d", col + 1);
+        // System.out.printf("%-3d", col + 1);
         // System.out.println();
 
         // Ordered key values

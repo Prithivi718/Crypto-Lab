@@ -104,7 +104,7 @@ public class CaesarCipher {
      */
     public static void demo(String secret) {
 
-        //int key = 3;
+        // int key = 3;
         Scanner scr = new Scanner(System.in);
 
         System.out.println("\n========== CAESAR CIPHER ==========");

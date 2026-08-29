@@ -68,6 +68,7 @@ public class DoubleColumnarTransposition {
 
         String second = encrypt(first, key, "Second Transposition");
         System.out.println("Double Cipher : " + second);
+
+        sc.close();
     }
 }
-

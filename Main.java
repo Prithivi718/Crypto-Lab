@@ -4,11 +4,11 @@ public class Main {
 
     public static void main(String[] args) {
 
-	Scanner scr = new Scanner(System.in);
-	System.out.println("Enter the secret message: ");
-	
-	String secret = scr.nextLine();
-        //String secret = "HELLO WORLD";
+        Scanner scr = new Scanner(System.in);
+        System.out.println("Enter the secret message: ");
+
+        String secret = scr.nextLine();
+        // String secret = "HELLO WORLD";
 
         // CaesarCipher.demo(secret);
 
@@ -18,6 +18,7 @@ public class Main {
 
         HillCipher.demo(secret);
 
+        scr.close();
 
     }
 }

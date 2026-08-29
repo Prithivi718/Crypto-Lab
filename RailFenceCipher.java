@@ -4,19 +4,23 @@ public class RailFenceCipher {
 
     static String encrypt(String text, int depth) {
         StringBuilder[] rail = new StringBuilder[depth];
-        for (int i = 0; i < depth; i++) rail[i] = new StringBuilder();
+        for (int i = 0; i < depth; i++)
+            rail[i] = new StringBuilder();
 
         int row = 0, dir = 1;
 
         for (char ch : text.toCharArray()) {
             rail[row].append(ch);
-            if (row == 0) dir = 1;
-            else if (row == depth - 1) dir = -1;
+            if (row == 0)
+                dir = 1;
+            else if (row == depth - 1)
+                dir = -1;
             row += dir;
         }
 
         StringBuilder cipher = new StringBuilder();
-        for (StringBuilder r : rail) cipher.append(r);
+        for (StringBuilder r : rail)
+            cipher.append(r);
 
         return cipher.toString();
     }
@@ -28,8 +32,10 @@ public class RailFenceCipher {
         // Mark pattern
         for (int i = 0; i < cipher.length(); i++) {
             rail[row][i] = '*';
-            if (row == 0) dir = 1;
-            else if (row == depth - 1) dir = -1;
+            if (row == 0)
+                dir = 1;
+            else if (row == depth - 1)
+                dir = -1;
             row += dir;
         }
 
@@ -37,7 +43,8 @@ public class RailFenceCipher {
         int k = 0;
         for (int i = 0; i < depth; i++)
             for (int j = 0; j < cipher.length(); j++)
-                if (rail[i][j] == '*') rail[i][j] = cipher.charAt(k++);
+                if (rail[i][j] == '*')
+                    rail[i][j] = cipher.charAt(k++);
 
         // Read plain text
         StringBuilder plain = new StringBuilder();
@@ -46,8 +53,10 @@ public class RailFenceCipher {
 
         for (int i = 0; i < cipher.length(); i++) {
             plain.append(rail[row][i]);
-            if (row == 0) dir = 1;
-            else if (row == depth - 1) dir = -1;
+            if (row == 0)
+                dir = 1;
+            else if (row == depth - 1)
+                dir = -1;
             row += dir;
         }
 
@@ -66,5 +75,7 @@ public class RailFenceCipher {
         String cipher = encrypt(text, depth);
         System.out.println("Encrypted Text: " + cipher);
         System.out.println("Decrypted Text: " + decrypt(cipher, depth));
+
+        sc.close();
     }
 }
