@@ -1,7 +1,33 @@
+import React, { useState } from 'react';
 import ShapeGrid from '../backgrounds/ShapeGrid';
 import { MissionUpload } from './MissionUpload';
 
-export const MissionIntake = () => {
+export const MissionIntake = ({
+    onStartWorkflow = () => { },
+    onRunProcess = () => { }
+}) => {
+    const [selectedFile, setSelectedFile] = useState(null);
+
+    const handleStartWorkflow = () => {
+        onStartWorkflow(selectedFile);
+        const element = document.getElementById('pipeline');
+        if (element) {
+            const yOffset = -80;
+            const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+            window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+    };
+
+    const handleRunProcess = () => {
+        onRunProcess(selectedFile);
+        const element = document.getElementById('analysis');
+        if (element) {
+            const yOffset = -80;
+            const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+            window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+    };
+
     return (
         <section id="mission" className="mission-hero-section" aria-label="Mission Intake">
             {/* Interactive Shape Grid Canvas Background */}
@@ -43,34 +69,22 @@ export const MissionIntake = () => {
                     {/* Right Column */}
                     <div className="hero-right-col">
                         {/* Secure Terminal Upload Module */}
-                        <MissionUpload />
+                        <MissionUpload onFileSelected={(file) => setSelectedFile(file)} />
 
                         {/* CTAs Row below Upload Box */}
                         <div className="hero-cta-row">
                             <button
                                 className="cta-demo-button"
-                                onClick={() => {
-                                    const element = document.getElementById('concepts');
-                                    if (element) {
-                                        const yOffset = -80;
-                                        const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
-                                        window.scrollTo({ top: y, behavior: 'smooth' });
-                                    }
-                                }}
+                                onClick={handleStartWorkflow}
+                                type="button"
                             >
                                 Run secure demonstration &rarr;
                             </button>
 
                             <button
                                 className="cta-algo-button"
-                                onClick={() => {
-                                    const element = document.getElementById('concepts');
-                                    if (element) {
-                                        const yOffset = -80;
-                                        const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
-                                        window.scrollTo({ top: y, behavior: 'smooth' });
-                                    }
-                                }}
+                                onClick={handleRunProcess}
+                                type="button"
                             >
                                 Run algorithm
                             </button>

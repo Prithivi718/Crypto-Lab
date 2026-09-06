@@ -1,29 +1,32 @@
 // processController.js
-
-import { runBenchmarkProcess } from '../services/benchmark.service.js';
+import { process_run } from '../services/process.service.js';
+import { successResponse, errorResponse } from '../utils/responseUtils.js';
 
 export const runProcess = async (req, res) => {
     try {
-        const { message } = req.body;
+        const { message, filename, fileSize } = req.body;
 
         if (!message) {
-            return res.status(400).json({ error: "Message is required" });
+            return errorResponse(res, 'Message is required', 'MISSING_MESSAGE', 400);
         }
 
-        // We use the benchmark process so an independent performance
-        // report is saved natively to the reports folder with analytics
-        const result = await runBenchmarkProcess(message, "direct_api_input");
+        const result = await process_run(message, { filename, fileSize });
 
         if (!result.success) {
-            return res.status(500).json(result);
+            return errorResponse(res, result.error || 'Process execution failed', 'EXECUTION_FAILED', 500);
         }
 
-        return res.status(200).json(result);
-
+        return successResponse(
+            res,
+            {
+                executionId: result.executionId,
+                status: result.status,
+                summary: result.summary,
+                timing: result.timing
+            },
+            'Process execution completed successfully'
+        );
     } catch (error) {
-        return res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        return errorResponse(res, error.message, 'INTERNAL_ERROR', 500);
     }
 };

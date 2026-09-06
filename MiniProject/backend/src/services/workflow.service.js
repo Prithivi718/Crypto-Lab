@@ -1,10 +1,11 @@
-// workflow.service.js
-//
-// Orchestrates the step-by-step cryptographic workflow state.
-// Maintains the state in memory, allowing interactive execution.
-//
+/**
+ * workflow.service.js
+ * Interactive, step-by-step cryptographic demonstration workflow service.
+ * Manages sequential execution across the 9 cryptographic steps while updating
+ * the central Execution Context and generating lightweight pipeline telemetry.
+ */
 
-import { randomUUID } from "node:crypto";
+import { randomUUID } from 'node:crypto';
 import {
     generateEdKeys,
     keyExchange,
@@ -17,278 +18,583 @@ import {
     verifyEd25519,
     unwrapSessionKey,
     decryptMessage
-} from "./crypto.service.js";
+} from './crypto.service.js';
 
-// In-memory state store logic (for a real app, use Redis/DB for persistence,
-// but in-memory is fine for demonstration).
+import { createExecution, getExecution, updateExecution } from './executionStore.js';
+import { maskSensitive } from '../utils/maskSensitive.js';
+import { measureAsync, measureSync } from '../utils/timingUtils.js';
+
 const activeWorkflows = new Map();
 
-export const initializeWorkflow = (message) => {
-    const workflowId = randomUUID();
+/**
+ * Initializes a new workflow session tied to a central Execution Context.
+ * @param {Object} inputData - { message, filename, fileSize }
+ * @returns {Object} Workflow session info
+ */
+export const startWorkflow = (inputData = {}) => {
+    const message = typeof inputData === 'string' ? inputData : (inputData.message || 'Thanks a lot GPT');
+    const filename = inputData.filename || 'mission.txt';
+    const fileSize = inputData.fileSize || Buffer.byteLength(message);
+
+    const execution = createExecution({
+        message,
+        filename,
+        size: fileSize
+    });
+
+    const workflowId = `workflow-${randomUUID()}`;
     const workflowState = {
         workflowId,
-        message,
+        executionId: execution.executionId,
         currentStep: 0,
-        status: "initialized",
+        status: 'running',
         completedSteps: [],
-        ed25519: {},
-        ecdh: {},
-        hkdf: {},
-        rsa: {},
-        aes: {},
-        packet: {},
-        decryption: {}
+        stepData: {}
     };
+
     activeWorkflows.set(workflowId, workflowState);
 
     return {
+        success: true,
         workflowId,
-        status: workflowState.status,
+        executionId: execution.executionId
     };
 };
 
+export const initializeWorkflow = (message) => {
+    return startWorkflow({ message });
+};
+
+/**
+ * Legacy support / helper function to retrieve workflow session state.
+ */
 export const getWorkflowState = (workflowId) => {
     const state = activeWorkflows.get(workflowId);
     if (!state) {
-        throw new Error("Workflow not found");
+        throw new Error('Workflow not found');
     }
     return state;
 };
 
-// ============================================================
-// STEP RUNNERS
-// ============================================================
-
-export const runEncryptionStep = async (workflowId, requestedStep) => {
+/**
+ * Executes a specific workflow step sequentially (1 through 9).
+ * @param {string} workflowId 
+ * @param {number} requestedStep 
+ * @returns {Promise<Object>} Enriched step response + telemetry
+ */
+export const executeStep = async (workflowId, requestedStep) => {
     const state = getWorkflowState(workflowId);
+    const execution = getExecution(state.executionId);
+
+    if (!execution) {
+        throw new Error('Execution Context not found for workflow');
+    }
 
     if (requestedStep !== state.currentStep + 1) {
         throw new Error(`Invalid step progression. Expected step ${state.currentStep + 1}`);
     }
 
-    let result = {};
+    const isEncryptionPhase = requestedStep <= 6;
+    const phase = isEncryptionPhase ? 'encryption' : 'decryption';
+
+    let stepDetails = {};
+    let algorithm = '';
+    let title = '';
+    let description = '';
+    let durationMs = 0;
+    let lastOperationName = '';
 
     try {
         switch (requestedStep) {
-            case 1:
-                const edKeys = await generateEdKeys();
-                state.ed25519 = edKeys;
-                result = {
-                    title: "Ed25519 Authentication",
-                    description: "Sender generating Ed25519 key pair for digital signature.",
-                    algorithm: "Ed25519",
-                    details: {
-                        publicKeyFormat: "JWK (Conceptual)",
-                        keyReady: true
-                    }
-                };
-                break;
+            // ----------------------------------------------------
+            // STEP 1 — Ed25519 Authentication
+            // ----------------------------------------------------
+            case 1: {
+                algorithm = 'Ed25519';
+                title = 'Ed25519 Authentication';
+                description = 'Sender generating Ed25519 key pair for digital signature.';
+                lastOperationName = 'Ed25519 Gen';
 
-            case 2:
-                const ecdhData = keyExchange();
-                state.ecdh = ecdhData;
-                result = {
-                    title: "ECDH Key Exchange",
-                    description: "Both bases generate keys and independently calculate the same shared secret.",
-                    algorithm: "ECDH",
-                    details: {
-                        sharedSecretsMatch: ecdhData.sharedSecretsMatch,
-                    }
-                };
-                break;
+                const { result, durationMs: dMs } = await measureAsync(
+                    'ed25519Gen',
+                    () => generateEdKeys()
+                );
+                durationMs = dMs;
 
-            case 3:
-                const sessionKey = await deriveSessionKey(state.ecdh.baseASharedSecret);
-                state.hkdf.sessionKey = sessionKey;
-                result = {
-                    title: "HKDF Key Derivation",
-                    description: "Deriving 256-bit AES session key from the ECDH shared secret.",
-                    algorithm: "HKDF",
-                    details: {
-                        sessionKeyLength: sessionKey.length || sessionKey.byteLength
-                    }
-                };
-                break;
+                const { edPublicKey, edPrivateKey } = result;
 
-            case 4:
-                const rsaKeys = await generateRSAKeys();
-                state.rsa = rsaKeys;
-                const wrappedSessionKey = await wrapSessionKey(state.hkdf.sessionKey, rsaKeys.rsaPublicKey);
-                state.rsa.wrappedSessionKey = wrappedSessionKey;
-                result = {
-                    title: "RSA-OAEP Key Protection",
-                    description: "Wrapping AES session key with RSA public key.",
-                    algorithm: "RSA-OAEP",
-                    details: {
-                        wrappedKeyLength: wrappedSessionKey.byteLength
-                    }
-                };
-                break;
+                state.stepData.ed25519 = result;
 
-            case 5:
-                const encrypted = encryptMessage(state.message, state.hkdf.sessionKey);
-                state.aes = encrypted;
-                result = {
-                    title: "AES-256-GCM Message Encryption",
-                    description: "Message encrypted using AES-256 session key.",
-                    algorithm: "AES-256-GCM",
-                    details: {
-                        ciphertextHex: encrypted.ciphertext.toString("hex").slice(0, 32) + "...",
-                        ivHex: encrypted.iv.toString("hex"),
-                        authTagHex: encrypted.authTag.toString("hex")
+                updateExecution(state.executionId, {
+                    cryptographicMaterial: {
+                        ed25519: {
+                            edPublicKey: edPublicKey.toString('hex'),
+                            edPrivateKey: edPrivateKey.toString('hex')
+                        }
+                    },
+                    measurements: {
+                        times: { ed25519Gen: durationMs }
                     }
-                };
-                break;
-
-            case 6:
-                const signedDataString = createSignedData({
-                    senderId: "BASE-A",
-                    ecdhPublicKey: state.ecdh.baseAPublicKey,
-                    wrappedSessionKey: state.rsa.wrappedSessionKey,
-                    ciphertext: state.aes.ciphertext,
-                    iv: state.aes.iv,
-                    authTag: state.aes.authTag
                 });
-                state.packet.signedData = signedDataString;
 
-                const signature = await signEd25519(signedDataString, state.ed25519.edPrivateKey);
-                state.packet.signature = signature;
-
-                result = {
-                    title: "Packet Signing",
-                    description: "Creating secure packet and signing with Ed25519.",
-                    algorithm: "Ed25519",
-                    details: {
-                        signatureLength: signature.byteLength
-                    }
+                stepDetails = {
+                    publicKey: maskSensitive(edPublicKey),
+                    publicKeyFormat: 'JWK',
+                    keyReady: true
                 };
                 break;
+            }
 
-            default:
-                throw new Error("Invalid encryption step");
-        }
+            // ----------------------------------------------------
+            // STEP 2 — ECDH Key Exchange
+            // ----------------------------------------------------
+            case 2: {
+                algorithm = 'ECDH';
+                title = 'ECDH Key Exchange';
+                description = 'Both bases generate keys and independently calculate the same shared secret.';
+                lastOperationName = 'ECDH Exchange';
 
-        state.currentStep = requestedStep;
-        state.completedSteps.push(requestedStep);
-
-        return {
-            step: requestedStep,
-            phase: "encryption",
-            status: "completed",
-            ...result
-        };
-
-    } catch (error) {
-        return {
-            step: requestedStep,
-            phase: "encryption",
-            status: "failed",
-            error: error.message
-        };
-    }
-};
-
-
-export const runDecryptionStep = async (workflowId, requestedStep) => {
-    const state = getWorkflowState(workflowId);
-
-    // Decryption steps conceptually follow encryption steps.
-    // Enc = steps 1-6. Dec = steps 7-9.
-
-    if (requestedStep !== state.currentStep + 1) {
-        throw new Error(`Invalid step progression. Expected step ${state.currentStep + 1}`);
-    }
-
-    let result = {};
-
-    try {
-        switch (requestedStep) {
-            case 7:
-                const signatureValid = await verifyEd25519(
-                    state.packet.signedData,
-                    state.packet.signature,
-                    state.ed25519.edPublicKey
+                const { result, durationMs: dMs } = measureSync(
+                    'ecdhExchange',
+                    () => keyExchange()
                 );
+                durationMs = dMs;
 
-                if (!signatureValid) throw new Error("Signature verification failed. Packet tampered.");
+                const {
+                    baseAPublicKey,
+                    baseBPublicKey,
+                    baseASharedSecret,
+                    baseBSharedSecret,
+                    sharedSecretsMatch
+                } = result;
 
-                state.decryption.signatureValid = true;
+                state.stepData.ecdh = result;
 
-                result = {
-                    title: "Signature Verification",
-                    description: "Receiver verifies Ed25519 signature.",
-                    algorithm: "Ed25519",
-                    details: {
-                        valid: true
+                updateExecution(state.executionId, {
+                    cryptographicMaterial: {
+                        ecdh: {
+                            baseAPublicKey: baseAPublicKey.toString('hex'),
+                            baseBPublicKey: baseBPublicKey.toString('hex'),
+                            sharedSecret: baseASharedSecret.toString('hex')
+                        }
+                    },
+                    verification: { sharedSecretsMatch },
+                    measurements: {
+                        times: { ecdhExchange: durationMs }
                     }
+                });
+
+                stepDetails = {
+                    baseAPublicKey: maskSensitive(baseAPublicKey),
+                    baseBPublicKey: maskSensitive(baseBPublicKey),
+                    sharedSecret: maskSensitive(baseASharedSecret),
+                    sharedSecretsMatch
                 };
                 break;
+            }
 
-            case 8:
-                const recoveredSessionKey = await unwrapSessionKey(
-                    state.rsa.wrappedSessionKey,
-                    state.rsa.rsaPrivateKey
+            // ----------------------------------------------------
+            // STEP 3 — HKDF Key Derivation
+            // ----------------------------------------------------
+            case 3: {
+                algorithm = 'HKDF';
+                title = 'HKDF Key Derivation';
+                description = 'Deriving 256-bit AES session key from the ECDH shared secret.';
+                lastOperationName = 'HKDF Derivation';
+
+                const sharedSecret = state.stepData.ecdh.baseASharedSecret;
+                const { result: sessionKey, durationMs: dMs } = await measureAsync(
+                    'hkdfDerivation',
+                    () => deriveSessionKey(sharedSecret)
                 );
-                state.decryption.recoveredSessionKey = recoveredSessionKey;
+                durationMs = dMs;
 
-                result = {
-                    title: "RSA Session Key Recovery",
-                    description: "Receiver recovers AES session key using RSA private key.",
-                    algorithm: "RSA-OAEP",
-                    details: {
-                        recoveredKeyLength: recoveredSessionKey.byteLength ?? recoveredSessionKey.length
+                state.stepData.sessionKey = sessionKey;
+
+                const salt = '9e410000000000000000000000000000';
+                const hkdfInfo = '7365637572656e65742d73657373696f6e';
+
+                updateExecution(state.executionId, {
+                    cryptographicMaterial: {
+                        hkdf: {
+                            salt,
+                            hkdfInfo,
+                            sessionKey: sessionKey.toString('hex')
+                        }
+                    },
+                    measurements: {
+                        times: { hkdfDerivation: durationMs },
+                        sizes: { sessionKey: sessionKey.length || 32 }
                     }
+                });
+
+                stepDetails = {
+                    salt: maskSensitive(salt),
+                    hkdfInfo: maskSensitive(hkdfInfo),
+                    sessionKey: maskSensitive(sessionKey),
+                    sessionKeyLength: sessionKey.length || 32
                 };
                 break;
+            }
 
-            case 9:
-                const decryptedData = decryptMessage(
-                    state.aes.ciphertext,
-                    state.decryption.recoveredSessionKey,
-                    state.aes.iv,
-                    state.aes.authTag
+            // ----------------------------------------------------
+            // STEP 4 — RSA-OAEP Key Protection
+            // ----------------------------------------------------
+            case 4: {
+                algorithm = 'RSA-OAEP';
+                title = 'RSA-OAEP Key Protection';
+                description = 'Wrapping AES session key with RSA public key.';
+                lastOperationName = 'RSA Wrap';
+
+                const { result: rsaRes, durationMs: genMs } = await measureAsync(
+                    'rsaGen',
+                    () => generateRSAKeys()
                 );
+                const { rsaPublicKey, rsaPrivateKey } = rsaRes;
+                state.stepData.rsaKeys = rsaRes;
 
-                if (!decryptedData.success) {
-                    throw new Error("AES-GCM decryption failed.");
+                const sessionKey = state.stepData.sessionKey;
+                const { result: wrappedSessionKey, durationMs: wrapMs } = await measureAsync(
+                    'rsaWrap',
+                    () => wrapSessionKey(sessionKey, rsaPublicKey)
+                );
+                durationMs = parseFloat((genMs + wrapMs).toFixed(4));
+
+                state.stepData.wrappedSessionKey = wrappedSessionKey;
+
+                updateExecution(state.executionId, {
+                    cryptographicMaterial: {
+                        rsa: {
+                            rsaPublicKey: rsaPublicKey.toString('hex'),
+                            rsaPrivateKey: rsaPrivateKey.toString('hex'),
+                            wrappedSessionKey: wrappedSessionKey.toString('hex')
+                        }
+                    },
+                    measurements: {
+                        times: { rsaGen: genMs, rsaWrap: wrapMs },
+                        sizes: { wrappedSessionKey: wrappedSessionKey.length || 256 }
+                    }
+                });
+
+                stepDetails = {
+                    publicKey: maskSensitive(rsaPublicKey),
+                    wrappedSessionKey: maskSensitive(wrappedSessionKey),
+                    wrappedKeyLength: wrappedSessionKey.length || 256
+                };
+                break;
+            }
+
+            // ----------------------------------------------------
+            // STEP 5 — AES-256-GCM Message Encryption
+            // ----------------------------------------------------
+            case 5: {
+                algorithm = 'AES-256-GCM';
+                title = 'AES-256-GCM Message Encryption';
+                description = 'Message encrypted using AES-256 session key.';
+                lastOperationName = 'AES Encryption';
+
+                const message = execution.input.message;
+                const sessionKey = state.stepData.sessionKey;
+
+                const { result: encrypted, durationMs: dMs } = measureSync(
+                    'aesEncryption',
+                    () => encryptMessage(message, sessionKey)
+                );
+                durationMs = dMs;
+
+                const { ciphertext, iv, authTag } = encrypted;
+                state.stepData.encrypted = encrypted;
+
+                updateExecution(state.executionId, {
+                    process: {
+                        encryption: {
+                            ciphertextHex: ciphertext.toString('hex'),
+                            ivHex: iv.toString('hex'),
+                            authTagHex: authTag.toString('hex')
+                        }
+                    },
+                    cryptographicMaterial: {
+                        aes: {
+                            sessionKey: sessionKey.toString('hex'),
+                            ciphertext: ciphertext.toString('hex'),
+                            iv: iv.toString('hex'),
+                            authTag: authTag.toString('hex')
+                        }
+                    },
+                    measurements: {
+                        times: { aesEncryption: durationMs },
+                        sizes: {
+                            ciphertext: ciphertext.length,
+                            iv: iv.length,
+                            authTag: authTag.length
+                        }
+                    }
+                });
+
+                stepDetails = {
+                    ciphertextHex: maskSensitive(ciphertext),
+                    ivHex: maskSensitive(iv),
+                    authTagHex: maskSensitive(authTag),
+                    ciphertextLength: ciphertext.length,
+                    ivLength: iv.length,
+                    authTagLength: authTag.length
+                };
+                break;
+            }
+
+            // ----------------------------------------------------
+            // STEP 6 — Packet Signing
+            // ----------------------------------------------------
+            case 6: {
+                algorithm = 'Ed25519';
+                title = 'Packet Signing';
+                description = 'Creating secure packet and signing with Ed25519.';
+                lastOperationName = 'Ed25519 Sign';
+
+                const ecdhPublicKey = state.stepData.ecdh.baseAPublicKey;
+                const wrappedSessionKey = state.stepData.wrappedSessionKey;
+                const { ciphertext, iv, authTag } = state.stepData.encrypted;
+
+                const signedData = createSignedData({
+                    senderId: 'BASE-A',
+                    ecdhPublicKey,
+                    wrappedSessionKey,
+                    ciphertext,
+                    iv,
+                    authTag
+                });
+                state.stepData.signedData = signedData;
+
+                const edPrivateKey = state.stepData.ed25519.edPrivateKey;
+                const { result: signature, durationMs: dMs } = await measureAsync(
+                    'ed25519Sign',
+                    () => signEd25519(signedData, edPrivateKey)
+                );
+                durationMs = dMs;
+
+                state.stepData.signature = signature;
+
+                updateExecution(state.executionId, {
+                    cryptographicMaterial: {
+                        signature: { signature: signature.toString('hex') }
+                    },
+                    measurements: {
+                        times: { ed25519Sign: durationMs },
+                        sizes: { signature: signature.length || 64 }
+                    }
+                });
+
+                stepDetails = {
+                    signature: maskSensitive(signature),
+                    signatureLength: signature.length || 64
+                };
+                break;
+            }
+
+            // ----------------------------------------------------
+            // STEP 7 — Signature Verification
+            // ----------------------------------------------------
+            case 7: {
+                algorithm = 'Ed25519';
+                title = 'Signature Verification';
+                description = 'Receiver verifies Ed25519 signature.';
+                lastOperationName = 'Ed25519 Verify';
+
+                const signedData = state.stepData.signedData;
+                const signature = state.stepData.signature;
+                const edPublicKey = state.stepData.ed25519.edPublicKey;
+
+                const { result: valid, durationMs: dMs } = await measureAsync(
+                    'ed25519Verify',
+                    () => verifyEd25519(signedData, signature, edPublicKey)
+                );
+                durationMs = dMs;
+
+                if (!valid) {
+                    throw new Error('Ed25519 signature verification failed');
                 }
 
-                state.decryption.plaintext = decryptedData.plaintext;
-
-                result = {
-                    title: "AES-256-GCM Decryption",
-                    description: "Decrypting ciphertext and verifying auth tag.",
-                    algorithm: "AES-256-GCM",
-                    details: {
-                        plaintext: decryptedData.plaintext
+                updateExecution(state.executionId, {
+                    verification: { signatureValid: valid },
+                    measurements: {
+                        times: { ed25519Verify: durationMs }
                     }
+                });
+
+                stepDetails = { valid };
+                break;
+            }
+
+            // ----------------------------------------------------
+            // STEP 8 — RSA Session Key Recovery
+            // ----------------------------------------------------
+            case 8: {
+                algorithm = 'RSA-OAEP';
+                title = 'RSA Session Key Recovery';
+                description = 'Receiver recovers AES session key using RSA private key.';
+                lastOperationName = 'RSA Unwrap';
+
+                const wrappedSessionKey = state.stepData.wrappedSessionKey;
+                const rsaPrivateKey = state.stepData.rsaKeys.rsaPrivateKey;
+
+                const { result: recoveredSessionKey, durationMs: dMs } = await measureAsync(
+                    'rsaUnwrap',
+                    () => unwrapSessionKey(wrappedSessionKey, rsaPrivateKey)
+                );
+                durationMs = dMs;
+
+                state.stepData.recoveredSessionKey = recoveredSessionKey;
+
+                updateExecution(state.executionId, {
+                    cryptographicMaterial: {
+                        rsa: { recoveredSessionKey: recoveredSessionKey.toString('hex') }
+                    },
+                    measurements: {
+                        times: { rsaUnwrap: durationMs }
+                    }
+                });
+
+                stepDetails = {
+                    recoveredSessionKey: maskSensitive(recoveredSessionKey),
+                    recoveredKeyLength: recoveredSessionKey.length || 32
                 };
                 break;
+            }
+
+            // ----------------------------------------------------
+            // STEP 9 — AES-256-GCM Decryption
+            // ----------------------------------------------------
+            case 9: {
+                algorithm = 'AES-256-GCM';
+                title = 'AES-256-GCM Decryption';
+                description = 'Decrypting ciphertext and verifying auth tag.';
+                lastOperationName = 'AES Decryption';
+
+                const { ciphertext, iv, authTag } = state.stepData.encrypted;
+                const recoveredSessionKey = state.stepData.recoveredSessionKey;
+
+                const { result: decrypted, durationMs: dMs } = measureSync(
+                    'aesDecryption',
+                    () => decryptMessage(ciphertext, recoveredSessionKey, iv, authTag)
+                );
+                durationMs = dMs;
+
+                if (!decrypted.success) {
+                    throw new Error(`AES decryption failed: ${decrypted.error || 'Unknown error'}`);
+                }
+
+                const plaintextMatch = decrypted.plaintext === execution.input.message;
+
+                const times = execution.measurements?.times || {};
+                const totalElapsed = Object.values(times).reduce((acc, t) => acc + (typeof t === 'number' ? t : 0), 0) + durationMs;
+
+                updateExecution(state.executionId, {
+                    status: 'completed',
+                    completedAt: new Date().toISOString(),
+                    process: {
+                        decryption: {
+                            plaintext: decrypted.plaintext,
+                            decryptionSuccess: decrypted.success
+                        }
+                    },
+                    verification: {
+                        sharedSecretsMatch: execution.verification?.sharedSecretsMatch !== undefined ? execution.verification.sharedSecretsMatch : true,
+                        signatureValid: execution.verification?.signatureValid !== undefined ? execution.verification.signatureValid : true,
+                        decryptionSuccess: decrypted.success,
+                        plaintextMatch
+                    },
+                    measurements: {
+                        times: { aesDecryption: durationMs, totalElapsed: parseFloat(totalElapsed.toFixed(4)) }
+                    }
+                });
+
+                stepDetails = {
+                    sessionKey: maskSensitive(recoveredSessionKey),
+                    plaintext: maskSensitive(decrypted.plaintext)
+                };
+                break;
+            }
 
             default:
-                throw new Error("Invalid decryption step");
+                throw new Error(`Invalid workflow step: ${requestedStep}`);
         }
 
         state.currentStep = requestedStep;
         state.completedSteps.push(requestedStep);
 
-        return {
+        // Save step result into execution context workflow array
+        const currentSteps = execution.workflow.steps || [];
+        currentSteps.push({
             step: requestedStep,
-            phase: "decryption",
-            status: "completed",
-            ...result
-        };
+            phase,
+            algorithm,
+            title,
+            description,
+            status: 'completed',
+            durationMs,
+            details: stepDetails
+        });
 
-    } catch (error) {
+        updateExecution(state.executionId, {
+            workflow: { steps: currentSteps }
+        });
+
         return {
+            workflowId,
+            executionId: state.executionId,
             step: requestedStep,
-            phase: "decryption",
-            status: "failed",
-            error: error.message
+            phase,
+            status: 'completed',
+            title,
+            description,
+            algorithm,
+            details: stepDetails,
+            telemetry: {
+                lastOperation: lastOperationName || algorithm,
+                durationMs,
+                channel: algorithm,
+                integrity: 'NOMINAL'
+            }
+        };
+    } catch (error) {
+        updateExecution(state.executionId, {
+            status: 'failed',
+            error: {
+                step: requestedStep,
+                algorithm,
+                message: error.message
+            }
+        });
+
+        return {
+            workflowId,
+            executionId: state.executionId,
+            step: requestedStep,
+            phase,
+            status: 'failed',
+            title,
+            description,
+            algorithm,
+            error: error.message,
+            telemetry: {
+                lastOperation: lastOperationName || algorithm,
+                durationMs,
+                channel: algorithm,
+                integrity: 'DEGRADED'
+            }
         };
     }
 };
 
+/**
+ * Legacy step wrappers for backwards compatibility
+ */
+export const runEncryptionStep = async (workflowId, step) => executeStep(workflowId, step);
+export const runDecryptionStep = async (workflowId, step) => executeStep(workflowId, step);
+
+/**
+ * Resets/removes a workflow session.
+ */
 export const resetWorkflow = (workflowId) => {
     activeWorkflows.delete(workflowId);
     return true;
