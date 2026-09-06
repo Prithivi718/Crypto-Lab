@@ -1,4 +1,5 @@
 import multer from "multer";
+import path from "node:path";
 import { config } from '../config/config.js';
 
 const storage = multer.diskStorage({
@@ -7,8 +8,9 @@ const storage = multer.diskStorage({
         cb(null, config.dirs.upload);
     },
 
-    filename : function (req, file, cb) {
-        cb(null, file.fieldname + '-' + Date.now())
+    filename: function (req, file, cb) {
+        const ext = path.extname(file.originalname) || ".txt";
+        cb(null, file.fieldname + '-' + Date.now() + ext);
     }
 });
 

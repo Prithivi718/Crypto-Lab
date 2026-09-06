@@ -1,0 +1,76 @@
+/* src/styles/global.css */
+
+@import './variables.css';
+@import './reset.css';
+@import './typography.css';
+@import './layout.css';
+@import './mission.css';
+@import './concepts.css';
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: var(--font-body);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    min-width: 320px;
+    overflow-x: hidden;
+    line-height: var(--line-height-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    /* Subtle technical grid background as requested in plan.txt */
+    background-image:
+        linear-gradient(rgba(106, 115, 55, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(106, 115, 55, 0.03) 1px, transparent 1px);
+    background-size: 64px 64px;
+}
+
+.container {
+    width: 100%;
+    max-width: var(--container-max-width);
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: clamp(16px, 4vw, 64px);
+    padding-right: clamp(16px, 4vw, 64px);
+}
+
+.container-wide {
+    width: 100%;
+    max-width: var(--container-wide-width);
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: clamp(16px, 4vw, 64px);
+    padding-right: clamp(16px, 4vw, 64px);
+}
+
+.page-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.section {
+    padding-top: var(--space-12);
+    padding-bottom: var(--space-12);
+}
+
+.section-header {
+    margin-bottom: var(--space-8);
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: var(--space-4);
+}
+
+/* Base link styles */
+a {
+    color: var(--accent-bright);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+}
+
+a:hover {
+    text-decoration: underline;
+    color: var(--text-primary);
+}

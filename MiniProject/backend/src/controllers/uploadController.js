@@ -13,15 +13,14 @@ export const handleUpload = async (req, res) => {
         const fileContent = await fs.readFile(filePath, 'utf8');
 
         if (!fileContent || fileContent.trim() === '') {
-            await fs.unlink(filePath).catch(console.error); // cleanup
             return res.status(400).json({ error: "File is empty" });
         }
 
         // Initialize the workflow using the extracted text
         const workflowInitParams = initializeWorkflow(fileContent);
 
-        // Clean up the temporary file
-        await fs.unlink(filePath).catch(console.error);
+        // We now keep the file permanently stored in the uploads directory
+        // as requested, instead of unlinking it automatically.
 
         return res.status(201).json({
             message: "File successfully processed and workflow initialized.",
@@ -33,10 +32,7 @@ export const handleUpload = async (req, res) => {
     } catch (error) {
         console.error("Upload processing error:", error);
 
-        // Ensure cleanup even on error
-        if (req.file && req.file.path) {
-            await fs.unlink(req.file.path).catch(console.error);
-        }
+        // Ensure error logging but do not delete the file automatically.
 
         return res.status(500).json({ error: "Failed to process uploaded file." });
     }

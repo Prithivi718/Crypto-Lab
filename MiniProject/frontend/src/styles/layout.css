@@ -1,0 +1,50 @@
+/* src/styles/layout.css */
+
+/* Global Scroll Margin for fixed navbar offset (80px height) */
+html {
+    scroll-behavior: smooth;
+}
+
+section {
+    scroll-margin-top: 80px;
+}
+
+/* Base Page Wrapper */
+.mission-page {
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    background-color: var(--bg-primary);
+    overflow-x: hidden;
+}
+
+/* Shared Section Base */
+.app-section {
+    position: relative;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Section Header Shared Block */
+.section-header-block {
+    margin-bottom: var(--space-8);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.section-label {
+    letter-spacing: 0.25em;
+    color: var(--text-muted);
+}
+
+.section-heading {
+    color: var(--text-primary);
+    line-height: var(--line-height-tight);
+}
+
+.section-desc {
+    color: var(--text-secondary);
+    max-width: 600px;
+    line-height: var(--line-height-relaxed);
+}

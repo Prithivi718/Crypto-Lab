@@ -1,0 +1,37 @@
+/* src/components/common/Panel.css */
+.panel {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: var(--space-6);
+    position: relative;
+    overflow: hidden;
+}
+
+.panel-elevated {
+    background-color: var(--bg-panel-elevated);
+    box-shadow: var(--shadow-md);
+    border-color: var(--border-subtle);
+}
+
+.panel-highlighted {
+    border-color: var(--accent-primary);
+    background-color: var(--bg-panel);
+}
+
+/* Status variants */
+.panel-success {
+    border-left: 4px solid var(--status-success);
+}
+
+.panel-warning {
+    border-left: 4px solid var(--status-warning);
+}
+
+.panel-danger {
+    border-left: 4px solid var(--status-danger);
+}
+
+.panel-info {
+    border-left: 4px solid var(--status-info);
+}
