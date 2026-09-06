@@ -1,0 +1,119 @@
+/* src/styles/variables.css */
+/* Fonts are loaded via <link> tags in index.html — do NOT @import here */
+
+:root {
+  /* ================================================== */
+  /* 1. TYPOGRAPHY                                      */
+  /* ================================================== */
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Geist', sans-serif;
+  --font-mono: 'Geist Mono', monospace;
+
+  /* Type Scale */
+  --text-hero: clamp(3.5rem, 7vw, 6.5rem);
+  --text-display-xl: clamp(3rem, 5vw, 5rem);
+  --text-display-lg: clamp(2.5rem, 4vw, 4rem);
+
+  --text-heading-xl: 2.5rem;
+  --text-heading-lg: 2rem;
+  --text-heading-md: 1.5rem;
+  --text-heading-sm: 1.25rem;
+
+  --text-body-lg: 1.125rem;
+  --text-body-base: 1rem;
+  --text-body-sm: 0.875rem;
+  --text-body-xs: 0.75rem;
+
+  --text-mono-lg: 0.875rem;
+  --text-mono-base: 0.75rem;
+  --text-mono-sm: 0.6875rem;
+  --text-mono-xs: 0.625rem;
+
+  --line-height-tight: 1.1;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.7;
+
+  /* ================================================== */
+  /* 2. COLOR SYSTEM (Army Palette)                     */
+  /* ================================================== */
+  /* Core variables from reference */
+  --color-dark-brown: #2B310A;
+  --color-dark-moss: #4B5320;
+  --color-reseda-green: #6A7337;
+  --color-moss-green: #929A68;
+  --color-french-gray: #AEB3B8;
+
+  /* Base darks */
+  --color-almost-black: #11120f;
+  --color-dark-panel: #1A1D13;
+  --color-panel-border: #32381F;
+
+  /* Semantic UI Colors */
+  --bg-primary: var(--color-almost-black);
+  --bg-secondary: var(--color-dark-panel);
+  --bg-panel: var(--color-dark-brown);
+  --bg-panel-elevated: var(--color-dark-panel);
+
+  --text-primary: #ECEEE1;
+  --text-secondary: var(--color-french-gray);
+  --text-muted: var(--color-moss-green);
+  --text-inverse: var(--color-almost-black);
+
+  --accent-primary: var(--color-reseda-green);
+  --accent-bright: #9EAB52;
+  /* Lighter version of reseda-green for hover */
+  --accent-muted: var(--color-dark-moss);
+
+  --border-subtle: rgba(106, 115, 55, 0.2);
+  --border-default: var(--color-panel-border);
+  --border-strong: var(--color-reseda-green);
+
+  /* Semantic Status Colors */
+  --status-success: #709A68;
+  /* Soft green */
+  --status-warning: #B3A45C;
+  /* Olive gold */
+  --status-danger: #9A534B;
+  /* Muted red */
+  --status-info: #5C819F;
+  /* Cool desaturated blue-green */
+
+  /* ================================================== */
+  /* 3. SPACING SYSTEM                                  */
+  /* ================================================== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* ================================================== */
+  /* 4. LAYOUT & GEOMETRY                               */
+  /* ================================================== */
+  --container-max-width: 1280px;
+  --container-wide-width: 1400px;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 10px rgba(106, 115, 55, 0.3);
+
+  /* ================================================== */
+  /* 5. MOTION & TRANSITIONS                            */
+  /* ================================================== */
+  --transition-fast: 100ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+}

@@ -1,0 +1,1302 @@
+Refine the existing LandingPage rather than rebuilding the project.
+
+There are two major issues to fix:
+
+1. HERO IMAGE CROPPING
+2. HERO TYPOGRAPHY / COMPOSITION
+
+HERO IMAGE
+The source image is 1672×941 (approximately 16:9).
+
+The current implementation constrains the background into a narrow/tall central
+container, causing severe horizontal cropping. Important visual elements such
+as the radar displays, peripheral operators, monitors, and other command-center
+details are being cut off.
+
+Fix this architecture:
+
+- The background image / GridDistortion canvas must span the entire viewport.
+- Hero background layer: width: 100vw; height: 100vh.
+- Do NOT apply the main content max-width to the background.
+- The content wrapper may have a max-width, but the image/WebGL layer must not.
+- Preserve the source image's natural 16:9 composition.
+- Do not stretch the image.
+- Use cover behavior only against the full viewport.
+- Keep the image centered.
+- Make sure the radar displays and major command-center composition remain
+  visible.
+- The image should feel like one continuous cinematic command-center scene.
+- Also I need the image to distored with cursor interaction.
+
+GRID DISTORTION
+Keep React Bits GridDistortion.
+
+It must operate as a subtle interactive enhancement of the image.
+
+Use only one GridDistortion instance.
+
+Keep the distortion restrained:
+- grid approximately 18–22
+- mouse approximately 0.08–0.15
+- strength approximately 0.08–0.14
+- relaxation approximately 0.92–0.97
+
+Do not allow the distortion to dominate the image.
+
+Keep the background layers separate:
+
+1. original image
+2. GridDistortion
+3. olive cinematic overlay
+4. vignette
+5. foreground UI/content
+
+The foreground text and buttons must never distort.
+
+OVERLAY
+The current image is too dark and the entire photograph is being treated
+uniformly.
+
+Use a directional olive overlay:
+- darker on the left behind the text
+- lighter toward the center/right so the world map and personnel remain visible
+
+Add a subtle vignette, not a heavy black overlay.
+
+NAVBAR
+Fix the current cramped navigation.
+
+Structure:
+
+SECURENET
+DEFENCE COMMUNICATIONS
+
+MISSION    PIPELINE    ANALYSIS
+
+Use actual flex/grid spacing instead of one concatenated text string.
+
+Keep the navbar fixed/absolute above the background.
+
+HERO CONTENT
+Replace the current generic headline with a stronger cryptographic identity.
+
+Eyebrow:
+
+SECURE DEFENCE COMMUNICATION NETWORK
+
+Main headline:
+
+SECURE THE
+SIGNAL.
+
+Secondary headline:
+
+VERIFY THE MESSAGE.
+
+Supporting text:
+
+SecureNet demonstrates a verified end-to-end
+cryptographic communication pipeline — from key
+exchange and session-key derivation to authenticated
+encryption, packet signing, and message recovery.
+
+Primary CTA:
+
+ENTER SECURE NETWORK →
+
+Secondary CTA:
+
+EXPLORE PIPELINE
+
+Technical line:
+
+AES-256-GCM · ED25519 · ECDH · HKDF · RSA-OAEP
+
+Add a subtle system indicator near the bottom-left:
+
+SECURENET // NODE 01
+CHANNEL STATUS  ● READY
+
+TYPOGRAPHY
+Use only the existing project fonts:
+
+- Space Grotesk: hero headline, branding, major headings
+- Geist Sans: supporting copy and normal UI
+- Geist Mono: technical labels, algorithms, system status
+
+The main headline should be large, editorial, and strongly hierarchical.
+
+Do NOT center the hero copy.
+
+Place the hero copy in the left third of the screen so the command-center
+world map and personnel remain visible on the center/right.
+
+Do not place important text directly over the brightest/high-detail parts
+of the world map.
+
+VISUAL STYLE
+The result should feel like:
+
+military command center
++
+cryptography laboratory
++
+secure communications terminal
+
+It should NOT feel like:
+- generic SaaS
+- cyberpunk
+- gaming UI
+- neon hacker interface
+- defence-company marketing website
+
+Use the existing army palette:
+#2B310A
+#4B5320
+#6A7337
+#929A68
+#AEB3B8
+
+Keep the design restrained, cinematic, technical, and serious.
+
+RESPONSIVENESS
+Desktop should be the primary composition.
+
+For tablet/mobile:
+- preserve the image as much as possible
+- reposition hero text rather than shrinking it excessively
+- reduce GridDistortion intensity
+- maintain readable contrast
+- prevent horizontal overflow
+
+ACCESSIBILITY / PERFORMANCE
+- respect prefers-reduced-motion
+- disable/reduce GridDistortion for reduced-motion users
+- clean up Three.js renderer, textures, animation frame, and event listeners
+- do not create multiple WebGL instances
+- do not add fake telemetry or fake crypto metrics
+- do not modify backend code
+
+IMPORTANT:
+Do not redesign the entire application.
+Only refine LandingPage, Navbar, background component, and their CSS.
+Keep the existing project architecture and reusable components.
+
+
+
+---- Next page design -----
+Prompt — Build SecureNet Mission Intake + Cryptographic Concepts Sections
+
+Build the first complete portion of the SecureNet — Secure Defence Communication Network frontend in React + Vite.
+
+The goal is to create a polished, serious, military/technical interface that feels like a secure communications command terminal + cryptographic laboratory, not a gaming/cyberpunk dashboard.
+
+For now, implement only these visual sections:
+
+Mission Intake / Hero section
+Three Security Indicators
+Cryptographic Concepts Accordion Gallery
+
+Do not implement the actual cryptographic execution, pipeline processing, benchmark logic, or analysis functionality yet. These sections should be visually and structurally complete so the later pages can be built on top of them.
+
+1. Reference components
+
+Use these React Bits references as the implementation basis:
+
+Shape Grid
+
+https://reactbits.dev/backgrounds/shape-grid
+
+Use the Shape Grid as the interactive background for the Mission Intake section.
+
+Preserve the basic Shape Grid behavior such as:
+
+grid movement
+hover interaction
+adjustable speed
+adjustable shape hover behavior
+direction
+interactive response
+
+However, visually adapt it to the SecureNet design system described below.
+
+Accordion Gallery
+
+https://reactbits.dev/components/accordion-gallery
+
+Use React Bits Accordion Gallery as the structural/interaction basis for the Cryptographic Concepts section.
+
+Important:
+
+Do not use photographs or unrelated stock images.
+
+For this first implementation, the Accordion Gallery should contain text-only content.
+
+No:
+
+diagrams
+SVG technical diagrams
+image backgrounds
+flowcharts
+image-based cards
+text-as-diagram layouts
+
+We will add richer technical visuals later.
+
+The current objective is to get the layout, expansion behavior, typography, spacing, and visual hierarchy correct first.
+
+2. Page behavior
+
+This is a single long page, not separate pages for these sections.
+
+The navbar should navigate using smooth scrolling.
+
+The page structure should conceptually be:
+
+NAVBAR
+   ↓
+MISSION INTAKE
+   ↓
+SECURITY INDICATORS
+   ↓
+CRYPTOGRAPHIC CONCEPTS
+   ↓
+[future sections later]
+
+Do not create separate routes for Mission Intake and Cryptographic Concepts at this stage.
+
+Give the sections proper IDs so the navbar can later scroll to them.
+
+Example:
+
+#mission
+#concepts
+
+Use smooth scrolling.
+
+3. Global visual language
+
+The entire interface must follow a restrained military/technical aesthetic.
+
+Do NOT make it:
+
+neon cyberpunk
+gaming-style
+futuristic SaaS
+colorful
+glossy
+overly rounded
+excessive glassmorphism
+
+It should feel:
+
+controlled
+technical
+secure
+military
+precise
+engineered
+minimal
+serious
+
+Use:
+
+Color palette
+--color-deep-olive: #2B310A;
+--color-dark-moss: #4B5320;
+--color-reseda: #6A7337;
+--color-moss: #929A68;
+--color-french-gray: #AEB3B8;
+
+Use near-black/dark surfaces where necessary, derived from the palette rather than introducing unrelated colors.
+
+Green accents should be subtle.
+
+Avoid bright fluorescent green.
+
+Borders should be thin and restrained.
+
+Use rectangular or slightly rounded panels.
+
+Preferred border radius:
+
+2px – 6px
+
+Avoid large pill shapes.
+
+4. Typography system
+
+Use these font roles consistently.
+
+Space Grotesk
+
+Use Space Grotesk for:
+
+hero heading
+section headings
+major titles
+large numbers
+branding
+prominent labels
+
+This should be the strongest display typeface.
+
+Geist Sans
+
+Use Geist Sans for:
+
+normal body text
+descriptions
+supporting text
+upload instructions
+explanatory content
+standard UI text
+Geist Mono
+
+Use Geist Mono for:
+
+technical labels
+algorithm names
+status labels
+system identifiers
+security indicators
+metadata
+section numbers
+small uppercase labels
+technical terminology
+
+Do NOT use one font everywhere.
+
+Create global CSS variables/classes for these typography roles rather than repeatedly defining font families throughout individual components.
+
+5. Modular code architecture
+
+Do NOT create a giant App.jsx.
+
+Keep the implementation modular.
+
+Use a structure similar to:
+
+src/
+├── components/
+│   ├── layout/
+│   │   ├── Navbar.jsx
+│   │   ├── PageShell.jsx
+│   │   └── Section.jsx
+│   │
+│   ├── common/
+│   │   ├── Button.jsx
+│   │   ├── Divider.jsx
+│   │   ├── StatusBadge.jsx
+│   │   └── Panel.jsx
+│   │
+│   ├── mission/
+│   │   ├── MissionIntake.jsx
+│   │   ├── MissionUpload.jsx
+│   │   └── SecurityIndicators.jsx
+│   │
+│   └── concepts/
+│       ├── CryptographicConcepts.jsx
+│       ├── ConceptAccordion.jsx
+│       └── conceptData.js
+│
+├── pages/
+│   └── MissionPage.jsx
+│
+├── styles/
+│   ├── globals.css
+│   ├── typography.css
+│   ├── variables.css
+│   ├── layout.css
+│   ├── mission.css
+│   └── concepts.css
+│
+└── App.jsx
+
+You may improve the exact structure, but preserve the principle:
+
+global styling → reusable components → section-specific components → page composition
+
+Do not put all CSS in one enormous file.
+
+Do not duplicate styles unnecessarily.
+
+6. Mission Intake section
+
+Create the first major section:
+
+MISSION INTAKE
+
+This section should visually occupy a large portion of the viewport.
+
+Use the React Bits Shape Grid as the background:
+
+https://reactbits.dev/backgrounds/shape-grid
+
+The Shape Grid should cover the entire Mission Intake section, not a small rectangle behind only the upload component.
+
+The grid should visually extend behind:
+
+left-side text
+right-side upload panel
+surrounding whitespace
+section boundaries
+
+The background must feel integrated with the entire hero.
+
+Shape Grid styling
+
+Adapt the Shape Grid to the SecureNet palette.
+
+The grid should be:
+
+subtle
+dark
+low contrast
+technically visible
+never distracting
+
+The + shaped intersections/markers should remain visible because they help visually communicate the idea of interface modules/cards.
+
+Keep the Shape Grid's interaction behavior, including:
+
+hover response
+speed
+directional movement
+shape interaction
+
+But tune it so it feels restrained rather than flashy.
+
+The text must remain completely readable above the grid.
+
+The grid must NEVER overpower the typography.
+
+7. Mission hero layout
+
+Use a two-column desktop layout.
+
+Approximately:
+
+┌───────────────────────────────────────────────────────┐
+│                                                       │
+│  LEFT                                RIGHT            │
+│                                                       │
+│  CONTROLLED ACCESS                 UPLOAD PANEL       │
+│                                                       │
+│  Transmit with                                       │
+│  absolute                           Drop mission      │
+│  confidence.                        briefing          │
+│                                                       │
+│  Description                         upload icon      │
+│                                       instructions    │
+│                                       status         │
+│                                                       │
+│                     Run secure demonstration →        │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+
+The layout should have generous horizontal spacing.
+
+The left content should be aligned naturally to the left.
+
+The upload panel should occupy the right side.
+
+Do not center everything.
+
+8. Mission text content
+
+Use exactly this structure.
+
+Technical eyebrow
+CONTROLLED ACCESS // LEVEL 04
+
+Use Geist Mono.
+
+Small uppercase technical styling.
+
+Hero heading
+Transmit with
+absolute
+confidence.
+
+Use Space Grotesk.
+
+Large.
+
+Strong.
+
+Left aligned.
+
+The visual emphasis should be:
+
+Transmit with
+absolute
+confidence.
+
+The final two lines can use a subtle moss/reseda accent while maintaining strong readability.
+
+Do not make all words different colors.
+
+Description
+
+Use:
+
+SecureNet orchestrates a complete cryptographic pipeline for sensitive defence communications. Drop a mission briefing to begin a verified, end-to-end transmission.
+
+Use Geist Sans.
+
+Muted French-gray/moss tone.
+
+Limit the width so it forms a clean readable paragraph rather than spanning across the whole screen.
+
+9. Upload panel
+
+Create a large rectangular upload panel.
+
+It should feel like a secure terminal module, not a standard web dropzone.
+
+Structure:
+
+┌─────────────────────────────────────────┐
+│                                         │
+│                 ↑                       │
+│                                         │
+│          Drop mission briefing          │
+│                                         │
+│     Drag and drop a .TXT file or        │
+│           browse from device            │
+│                                         │
+├─────────────────────────────────────────┤
+│ 🔒 ENCRYPTED IN TRANSIT       MAX 10 MB │
+└─────────────────────────────────────────┘
+
+Use a very subtle background tint.
+
+Thin border.
+
+Minimal radius.
+
+Left-aligned internal technical status where appropriate, while the main upload instruction can remain centered within the upload zone.
+
+Do not make it look like a conventional SaaS drag-and-drop component.
+
+Upload panel typography
+Main title
+Drop mission briefing
+
+Space Grotesk.
+
+Supporting text
+Drag and drop a .TXT file or browse from device
+
+Geist Sans.
+
+Metadata
+ENCRYPTED IN TRANSIT
+MAX 10 MB
+
+Geist Mono.
+
+10. Run secure demonstration CTA
+
+Place:
+
+Run secure demonstration →
+
+under the upload box.
+
+It should look like a restrained technical action rather than a huge marketing button.
+
+Use:
+
+Geist Mono
+small/medium size
+moss/reseda accent
+subtle hover state
+thin underline/border interaction if appropriate
+
+It does not need to execute the backend yet.
+
+Create the interaction placeholder cleanly so the backend can be connected later.
+
+11. Security Indicators
+
+Directly below the Mission Intake hero, create a horizontal section containing exactly three security indicators.
+
+Use a darker solid section so it creates a subtle transition away from the Shape Grid.
+
+Structure:
+
+────────────────────────────────────────────────────────
+
+IDENTITY VERIFIED
+Ed25519 signatures
+
+KEY DERIVATION COMPLETE
+HKDF session-key derivation
+
+AUTHENTICATED ENCRYPTION
+AES-256-GCM payloads
+
+────────────────────────────────────────────────────────
+
+Each indicator should have:
+
+small technical visual/icon
+primary label
+secondary description
+
+Use the same typography rules.
+
+Primary labels:
+
+Geist Mono
+
+Descriptions:
+
+Geist Sans
+
+Do not use giant icons.
+
+Do not introduce unrelated illustrations.
+
+12. Important technical wording
+
+Use the correct terminology.
+
+Do NOT write:
+
+HKDF exchange
+
+Use:
+
+HKDF session-key derivation
+
+ECDH is the key agreement mechanism.
+
+HKDF performs key derivation.
+
+AES-256-GCM is authenticated encryption.
+
+Ed25519 is used for digital signatures/authentication.
+
+13. Transition into Cryptographic Concepts
+
+After the three indicators, introduce a noticeably darker section.
+
+This should feel like entering a new chapter.
+
+The Shape Grid should not continue strongly into this section.
+
+Use a dark near-black/olive surface.
+
+Keep the same global grid/technical visual language, but do not copy the hero background.
+
+There should be a clear but elegant section transition.
+
+14. Cryptographic Concepts section
+
+Use the React Bits Accordion Gallery as the interaction foundation:
+
+https://reactbits.dev/components/accordion-gallery
+
+However, customize the content completely for SecureNet.
+
+This is NOT an image gallery for the current version.
+
+It is a technical concept gallery.
+
+The panels contain text only.
+
+15. Concepts section heading
+
+Use:
+
+Technical section label
+03 — CRYPTOGRAPHIC CONCEPTS
+
+Use Geist Mono.
+
+Then main heading:
+
+The Cryptographic Stack
+
+Use Space Grotesk.
+
+Supporting text:
+
+Five cryptographic mechanisms work together to establish identity, derive session keys, protect payloads, and verify transmitted data.
+
+Use Geist Sans.
+
+Keep this area compact enough that the Accordion Gallery remains the visual focus.
+
+16. Accordion Gallery concepts
+
+Use exactly these five concepts.
+
+01 — ECDH
+ECDH
+KEY AGREEMENT
+
+Short collapsed content:
+
+Establish a shared secret.
+
+Expanded content:
+
+ECDH
+
+KEY AGREEMENT
+
+Elliptic Curve Diffie-Hellman establishes a shared secret between two endpoints without transmitting the secret itself.
+02 — HKDF
+
+Collapsed:
+
+HKDF
+KEY DERIVATION
+
+Short description:
+
+Derive secure session keys.
+
+Expanded:
+
+HKDF
+
+KEY DERIVATION
+
+HKDF derives cryptographically useful key material from the ECDH shared secret, producing the session key used by the symmetric encryption layer.
+03 — AES-256-GCM
+
+Collapsed:
+
+AES-256-GCM
+AUTHENTICATED ENCRYPTION
+
+Short description:
+
+Protect the mission payload.
+
+Expanded:
+
+AES-256-GCM
+
+AUTHENTICATED ENCRYPTION
+
+AES-256-GCM encrypts the mission content while producing authentication data that allows the receiver to detect unauthorized modification.
+04 — RSA-OAEP
+
+Collapsed:
+
+RSA-OAEP
+KEY WRAPPING
+
+Short description:
+
+Protect the session key.
+
+Expanded:
+
+RSA-OAEP
+
+KEY WRAPPING
+
+RSA-OAEP protects the derived session key for secure transport. The RSA layer wraps the session key rather than encrypting the full mission payload.
+05 — Ed25519
+
+Collapsed:
+
+ED25519
+DIGITAL SIGNATURES
+
+Short description:
+
+Authenticate the packet.
+
+Expanded:
+
+ED25519
+
+DIGITAL SIGNATURES
+
+Ed25519 creates a digital signature over the secure packet, allowing the receiving side to verify that the packet was produced by the corresponding signing key and has not been altered.
+17. Accordion behavior
+
+The Accordion Gallery should work like this:
+
+Collapsed panel
+
+Only show:
+
+01
+
+ECDH
+
+KEY AGREEMENT
+
+Establish a shared secret.
+
+Keep the content compact.
+
+The panel should primarily answer:
+
+“What concept is this?”
+
+Do not show the complete explanation when collapsed.
+
+Expanded panel
+
+When opened/activated, expand horizontally and reveal:
+
+01
+
+ECDH
+
+KEY AGREEMENT
+
+Elliptic Curve Diffie-Hellman establishes a shared secret between two endpoints without transmitting the secret itself.
+
+The expanded panel should feel substantially larger.
+
+The complete explanation should become readable.
+
+18. Critical alignment rule
+
+Whenever a panel is rectangular, all text content inside the panel must be left aligned.
+
+Do not center paragraphs.
+
+Do not center technical descriptions.
+
+For example:
+
+┌─────────────────────────────────────────┐
+│ 01                                      │
+│                                         │
+│ ECDH                                    │
+│ KEY AGREEMENT                           │
+│                                         │
+│ Elliptic Curve Diffie-Hellman           │
+│ establishes a shared secret between     │
+│ two endpoints without transmitting      │
+│ the secret itself.                      │
+│                                         │
+└─────────────────────────────────────────┘
+
+NOT:
+
+┌─────────────────────────────────────────┐
+│                ECDH                     │
+│             KEY AGREEMENT               │
+│       long centered paragraph...        │
+└─────────────────────────────────────────┘
+
+The design should have an editorial/technical documentation feel.
+
+19. Accordion card styling
+
+Collapsed panels:
+
+dark surface
+subtle border
+very low contrast
+small technical number
+algorithm name prominent
+short label
+very short description
+minimal padding
+
+Expanded panel:
+
+larger width
+stronger border
+larger heading
+full body copy
+stronger spacing
+readable paragraph width
+subtle accent border
+visually obvious active state
+
+Do not use excessive shadows.
+
+Do not use glowing borders.
+
+Use thin olive/moss borders.
+
+20. Typography inside Accordion
+Index
+01
+
+Use Geist Mono.
+
+Small.
+
+Algorithm
+ECDH
+
+Use Space Grotesk.
+
+Large relative to the other card text.
+
+Role
+KEY AGREEMENT
+
+Use Geist Mono.
+
+Uppercase/technical.
+
+Body
+
+Normal explanatory paragraph.
+
+Use Geist Sans.
+
+Readable line-height.
+
+21. No diagrams yet
+
+For this version, absolutely do NOT add:
+
+A → B
+ECDH ↓
+Shared Secret
+
+Do not create ASCII-style diagrams.
+
+Do not add graphical crypto flows.
+
+Do not add technical illustrations.
+
+Do not add images.
+
+We will add these later after the base interaction and layout are finalized.
+
+The current Accordion Gallery should prove that the text-only expandable concept system works visually.
+
+22. Concept data should be separate
+
+Do not hardcode all five cards directly inside JSX.
+
+Create something like:
+
+const concepts = [
+  {
+    id: "01",
+    algorithm: "ECDH",
+    role: "KEY AGREEMENT",
+    shortDescription: "Establish a shared secret.",
+    description: "Elliptic Curve Diffie-Hellman..."
+  },
+  ...
+];
+
+Then render the Accordion Gallery from the data.
+
+This allows us to later add:
+
+diagrams
+animations
+images
+technical metadata
+pipeline references
+
+without restructuring the component.
+
+23. Responsive behavior
+
+Desktop is the primary target.
+
+However, make the layout reasonably responsive.
+
+Desktop
+
+Two-column Mission Intake.
+
+Horizontal three-indicator row.
+
+Horizontal Accordion Gallery.
+
+Tablet
+
+Reduce spacing and typography.
+
+Allow upload panel and hero text to compress gracefully.
+
+Mobile
+
+Stack Mission text and upload panel vertically.
+
+Stack the three indicators.
+
+Accordion cards should remain usable.
+
+The expanded panel must never overflow horizontally.
+
+Do not destroy the interaction on smaller screens.
+
+24. Motion
+
+Animations should be restrained.
+
+Use:
+
+smooth section transitions
+subtle hover states
+smooth Accordion expansion
+Shape Grid interaction
+subtle border/accent transitions
+
+Do NOT use:
+
+excessive parallax
+bounce animations
+flashy particle effects
+aggressive glowing effects
+
+Respect:
+
+prefers-reduced-motion
+
+for users who disable animation.
+
+25. Important visual hierarchy
+
+The resulting page should visually read like:
+
+MISSION INTAKE
+      ↓
+   HERO / UPLOAD
+      ↓
+SECURITY INDICATORS
+      ↓
+──────────── DARK TRANSITION ────────────
+      ↓
+CRYPTOGRAPHIC CONCEPTS
+      ↓
+THE CRYPTOGRAPHIC STACK
+      ↓
+ECDH | HKDF | AES | RSA | ED25519
+
+The first section should feel like mission intake.
+
+The second section should feel like technical education/documentation.
+
+Do not make both sections look identical.
+
+26. Navbar
+
+Keep the navbar compatible with the single-page scrolling architecture.
+
+At this stage it should contain navigation items conceptually like:
+
+SECURENET / DEFENCE COMMUNICATIONS
+
+MISSION
+PIPELINE
+ANALYSIS
+
+For now, only MISSION should target the current section and PIPELINE / ANALYSIS can target placeholder/future sections.
+
+Use:
+
+Space Grotesk for SecureNet branding
+Geist Mono for technical navigation
+subtle active-state underline
+dark background
+thin bottom border
+
+Do not create a large navbar.
+
+27. CSS architecture
+
+Create global variables for:
+
+colors
+fonts
+spacing
+border radius
+border colors
+typography sizes
+transitions
+max content width
+
+For example:
+
+:root {
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Geist Sans", sans-serif;
+  --font-mono: "Geist Mono", monospace;
+
+  --color-deep-olive: #2B310A;
+  --color-dark-moss: #4B5320;
+  --color-reseda: #6A7337;
+  --color-moss: #929A68;
+  --color-french-gray: #AEB3B8;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+}
+
+Do not repeatedly hardcode these values across components.
+
+Final page:
+┌───────────────────────────────────────────────┐
+│ NAVBAR                                        │
+├───────────────────────────────────────────────┤
+│                                               │
+│        SECTION 01 — MISSION INTAKE            │
+│        [Shape Grid + + markers]               │
+│                                               │
+│   Transmit with          ┌───────────────┐    │
+│   absolute               │               │    │
+│   confidence.            │    UPLOAD     │    │
+│                          │               │    │
+│                          └───────────────┘    │
+│                                               │
+│        security indicators                    │
+│                                               │
+├───────────────────────────────────────────────┤
+│       DARK TRANSITION / SECTION BREAK         │
+├───────────────────────────────────────────────┤
+│                                               │
+│        SECTION 02 — CRYPTOGRAPHIC CONCEPTS    │
+│                                               │
+│    heading + description                      │
+│                                               │
+│    ┌──────────────┬───┬───┬───┬───┐           │
+│    │              │   │   │   │   │           │
+│    │   EXPANDED   │HKDF│AES│RSA│ED │          │
+│    │    ECDH      │   │   │   │   │           │
+│    │              │   │   │   │   │           │
+│    └──────────────┴───┴───┴───┴───┘           │
+│                                               │
+└───────────────────────────────────────────────┘
+
+
+One more thing I misunderstood to explain:
+Implement smooth section navigation and active navigation-state tracking for the landing page.
+
+The navbar contains navigation links corresponding to sections/pages within the same single-page website, for example:
+
+Mission Ingest
+Cryptographic Pipeline
+System Benchmark
+
+Each navigation link should point to its corresponding section using section IDs.
+
+1. Clicking a navbar link
+
+When the user clicks a navigation link:
+
+Do not reload the page.
+Smoothly scroll to the corresponding section.
+The target section should be positioned correctly below the fixed/sticky navbar so its heading/content isn't hidden behind the navbar.
+The clicked navigation link should immediately become the active navigation item.
+The active link should be visually indicated using the existing underline/accent-line styling.
+
+Example:
+
+Mission Ingest       Cryptographic Pipeline       System Benchmark
+     ─────
+      ACTIVE
+
+If the user clicks Cryptographic Pipeline:
+
+Mission Ingest       Cryptographic Pipeline       System Benchmark
+                          ─────────────────
+                               ACTIVE
+2. Scrolling manually
+
+The active navigation state must also update automatically when the user scrolls manually.
+
+As the user scrolls down through the page:
+
+Detect which major section is currently in the viewport.
+Update the corresponding navbar link to the active state.
+Remove the active styling from the previously active link.
+Apply the underline/accent indicator to the navigation link associated with the section currently being viewed.
+
+Therefore, the navbar should always communicate:
+
+"You are currently here."
+
+For example:
+
+┌─────────────────────────────────────────────────────────┐
+│ Mission Ingest   Cryptographic Pipeline   System Benchmark │
+│      ─────                                             │
+└─────────────────────────────────────────────────────────┘
+
+                   ↓ scroll
+
+┌─────────────────────────────────────────────────────────┐
+│ Mission Ingest   Cryptographic Pipeline   System Benchmark │
+│                    ─────────────────                     │
+└─────────────────────────────────────────────────────────┘
+3. Use Intersection Observer
+
+Prefer using IntersectionObserver rather than constantly listening to the scroll event.
+
+Configure it so that a section becomes active when a meaningful portion of that section enters the viewport.
+
+Avoid rapid flickering when two sections are simultaneously visible. There should always be one clearly active navigation item.
+
+4. Navbar behavior
+
+The navbar is fixed/sticky at the top of the page.
+
+Make sure the scroll target accounts for the navbar height.
+
+Use CSS such as:
+
+html {
+  scroll-behavior: smooth;
+}
+
+section {
+  scroll-margin-top: 80px;
+}
+
+Adjust 80px according to the actual navbar height rather than blindly using this value.
+
+5. Active navigation styling
+
+Do not redesign the navbar.
+
+Preserve the existing SecureNet visual language and styling.
+
+Only add the necessary active-state behavior:
+
+.nav-link.active {
+  /* existing active styling */
+}
+
+The active state should use the existing green/olive accent and underline rather than introducing a new color or visual treatment.
+
+6. Important behavior
+
+The navigation state must work in both directions:
+
+Scroll down → active section updates.
+Scroll up → active section updates.
+Click navbar link → smooth scroll + active state updates.
+Continue scrolling after clicking → active state continues updating naturally.
+
+Do not hardcode the active link based only on click events.
+
+The section currently visible in the viewport must ultimately determine the active navigation state.
+
+7. Keep the implementation simple
+
+Do not introduce unnecessary libraries or complex routing.
+
+This is a single-page scrolling navigation system, not separate routes/pages.
+
+Use the project's existing framework and architecture.
+
+Before modifying anything, inspect the existing navbar, section IDs, CSS, and component structure. Reuse the existing classes and styling wherever possible instead of creating duplicate navigation logic.
+
+Expected result: the navbar behaves like a section indicator. At all times, the underline should clearly tell the user which section of the SecureNet landing page they are currently viewing.

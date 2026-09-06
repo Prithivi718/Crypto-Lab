@@ -1,0 +1,201 @@
+/* src/styles/concepts.css */
+
+/* ── Section 3: Cryptographic Concepts ── */
+.concepts-section {
+    position: relative;
+    width: 100%;
+    background-color: #0D0F08;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: var(--space-16);
+    padding-bottom: var(--space-20);
+    z-index: 2;
+}
+
+/* Header */
+.concepts-header-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-bottom: var(--space-12);
+    text-align: left;
+}
+
+.concepts-section-tag {
+    font-family: var(--font-mono);
+    font-size: var(--text-mono-sm);
+    letter-spacing: 0.25em;
+    color: var(--text-muted);
+}
+
+.concepts-main-title {
+    font-family: var(--font-display);
+    font-size: var(--text-display-lg);
+    color: var(--text-primary);
+    margin: 0;
+    line-height: var(--line-height-tight);
+}
+
+.concepts-description {
+    font-family: var(--font-body);
+    font-size: var(--text-body-lg);
+    color: var(--text-secondary);
+    max-width: 620px;
+    margin: 0;
+    line-height: var(--line-height-relaxed);
+}
+
+/* Accordion Component Shell */
+.concepts-accordion-wrapper {
+    width: 100%;
+    margin-top: var(--space-8);
+}
+
+/* Text Accordion Grid/Flex Layout */
+.concept-accordion-container {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 380px;
+    gap: var(--space-3);
+    box-sizing: border-box;
+}
+
+/* Accordion Card (Rectangular, Left-Aligned) */
+.concept-card {
+    flex: 1;
+    height: 100%;
+    background-color: var(--color-dark-panel);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: var(--space-6);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+    transition: flex 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+        border-color var(--transition-normal),
+        background-color var(--transition-normal);
+}
+
+.concept-card:hover {
+    border-color: var(--accent-primary);
+    background-color: var(--color-dark-brown);
+}
+
+/* Active / Expanded Card */
+.concept-card.active {
+    flex: 3;
+    border-color: var(--accent-bright);
+    background-color: #1F2412;
+    box-shadow: var(--shadow-glow);
+}
+
+/* Card Top Metadata */
+.concept-card-top {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    width: 100%;
+    text-align: left;
+}
+
+.concept-number {
+    font-family: var(--font-mono);
+    font-size: var(--text-mono-xs);
+    letter-spacing: 0.2em;
+    color: var(--accent-bright);
+    opacity: 0.8;
+}
+
+.concept-algorithm {
+    font-family: var(--font-display);
+    font-size: var(--text-heading-lg);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    letter-spacing: 0.05em;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.concept-role {
+    font-family: var(--font-mono);
+    font-size: var(--text-mono-xs);
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+/* Card Body Content (Left-Aligned, Capped Width) */
+.concept-card-body {
+    margin-top: var(--space-6);
+    width: 100%;
+    text-align: left;
+}
+
+.concept-short-desc {
+    font-family: var(--font-body);
+    font-size: var(--text-body-sm);
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: var(--line-height-normal);
+}
+
+.concept-full-desc {
+    font-family: var(--font-body);
+    font-size: var(--text-body-base);
+    color: var(--text-primary);
+    margin: 0;
+    line-height: var(--line-height-relaxed);
+    max-width: 480px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease 0.1s, transform 0.3s ease 0.1s;
+}
+
+.concept-card.active .concept-full-desc {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.concept-card.active .concept-short-desc {
+    display: none;
+}
+
+/* Active Accent Line on Left Edge */
+.concept-card-accent-line {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 0%;
+    background-color: var(--accent-bright);
+    transition: height 0.3s ease;
+}
+
+.concept-card.active .concept-card-accent-line {
+    height: 100%;
+}
+
+/* Responsive Accordion for Smaller Viewports */
+@media (max-width: 768px) {
+    .concept-accordion-container {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .concept-card {
+        flex: none;
+        width: 100%;
+        min-height: 120px;
+    }
+
+    .concept-card.active {
+        flex: none;
+        min-height: 220px;
+    }
+}

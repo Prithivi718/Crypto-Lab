@@ -1,0 +1,91 @@
+/* src/components/common/Button.css */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-2) var(--space-4);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    /* Sharper tactical geometry */
+    font-family: var(--font-body);
+    font-size: var(--text-body-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-primary {
+    background-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: var(--accent-bright);
+}
+
+.btn-secondary {
+    background-color: var(--bg-panel);
+    border-color: var(--border-default);
+    color: var(--text-primary);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: var(--color-dark-moss);
+}
+
+.btn-outline {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.btn-outline:hover:not(:disabled) {
+    background-color: rgba(106, 115, 55, 0.1);
+    color: var(--accent-bright);
+}
+
+.btn-ghost {
+    color: var(--text-secondary);
+}
+
+.btn-ghost:hover:not(:disabled) {
+    background-color: rgba(174, 179, 184, 0.1);
+    color: var(--text-primary);
+}
+
+.btn-danger {
+    background-color: transparent;
+    color: var(--status-danger);
+    border-color: var(--status-danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+    background-color: var(--status-danger);
+    color: var(--text-primary);
+}
+
+.btn:disabled,
+.btn-disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.btn-loading {
+    cursor: wait;
+}
+
+.loader {
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    width: 14px;
+    height: 14px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

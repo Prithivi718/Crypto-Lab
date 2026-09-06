@@ -1,0 +1,135 @@
+### SECURE DEFENCE COMMUNICATION NETWORK - API TESTING
+### You can use these examples in Postman, Insomnia, or the VS Code "REST Client" extension.
+
+============================================================
+1. UPLOAD FILE & INITIALIZE WORKFLOW
+============================================================
+POST http://localhost:5000/api/upload
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="file"; filename="message.txt"
+Content-Type: text/plain
+
+TOP SECRET: Mission Alpha. Deliver package at 0300 hrs.
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+# => Response returns { workflowId: "uuid-...", extractedText: "..." }
+
+
+============================================================
+2. INTERACTIVE WORKFLOW STEPS
+============================================================
+# Replace the workflowId with the one you got from the upload step!
+
+### Step 1: Ed25519 Authentication (Sender Generating Keys)
+POST http://localhost:5000/api/workflow/step
+Content-Type: application/json
+
+{
+    "workflowId": "REPLACE_WITH_YOUR_WORKFLOW_ID",
+    "step": 1
+}
+
+### Step 2: ECDH Key Exchange
+POST http://localhost:5000/api/workflow/step
+Content-Type: application/json
+
+{
+    "workflowId": "REPLACE_WITH_YOUR_WORKFLOW_ID",
+    "step": 2
+}
+
+### Step 3: HKDF Key Derivation
+POST http://localhost:5000/api/workflow/step
+Content-Type: application/json
+
+{
+    "workflowId": "REPLACE_WITH_YOUR_WORKFLOW_ID",
+    "step": 3
+}
+
+### Step 4: RSA-OAEP Key Protection
+POST http://localhost:5000/api/workflow/step
+Content-Type: application/json
+
+{
+    "workflowId": "REPLACE_WITH_YOUR_WORKFLOW_ID",
+    "step": 4
+}
+
+### Step 5: AES-256-GCM Message Encryption
+POST http://localhost:5000/api/workflow/step
+Content-Type: application/json
+
+{
+    "workflowId": "REPLACE_WITH_YOUR_WORKFLOW_ID",
+    "step": 5
+}
+
+### Step 6: Create & Sign Packet (Ed25519)
+POST http://localhost:5000/api/workflow/step
+Content-Type: application/json
+
+{
+    "workflowId": "REPLACE_WITH_YOUR_WORKFLOW_ID",
+    "step": 6
+}
+
+### Step 7: Receiver Verifies Packet Signature
+POST http://localhost:5000/api/workflow/step
+Content-Type: application/json
+
+{
+    "workflowId": "REPLACE_WITH_YOUR_WORKFLOW_ID",
+    "step": 7
+}
+
+### Step 8: Receiver Recovers AES Key via RSA
+POST http://localhost:5000/api/workflow/step
+Content-Type: application/json
+
+{
+    "workflowId": "REPLACE_WITH_YOUR_WORKFLOW_ID",
+    "step": 8
+}
+
+### Step 9: Receiver Decrypts Message via AES-256-GCM
+POST http://localhost:5000/api/workflow/step
+Content-Type: application/json
+
+{
+    "workflowId": "REPLACE_WITH_YOUR_WORKFLOW_ID",
+    "step": 9
+}
+
+
+============================================================
+3. GET WORKFLOW STATE (Check Progress)
+============================================================
+GET http://localhost:5000/api/workflow/REPLACE_WITH_YOUR_WORKFLOW_ID
+
+
+============================================================
+4. RESET WORKFLOW
+============================================================
+POST http://localhost:5000/api/workflow/reset/REPLACE_WITH_YOUR_WORKFLOW_ID
+
+
+============================================================
+5. MONOLITHIC BENCHMARK PROCESS
+============================================================
+# Run the entire pipeline in one go and get performance analytics
+POST http://localhost:5000/api/process/run
+Content-Type: application/json
+
+{
+    "message": "TOP SECRET: Mission Alpha. Deliver package at 0300 hrs."
+}
+
+Secure communication channel initialized.
+Authentication of the sender has been verified.
+A shared session key is established securely.
+The message is encrypted using AES-256-GCM.
+The encrypted packet is digitally signed for integrity.
+Secure transmission completed successfully.

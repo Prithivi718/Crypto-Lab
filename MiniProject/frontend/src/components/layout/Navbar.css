@@ -1,0 +1,122 @@
+/* src/components/layout/Navbar.css */
+
+.site-navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 80px;
+    z-index: 100;
+    background-color: rgba(17, 18, 15, 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(106, 115, 55, 0.2);
+    display: flex;
+    align-items: center;
+    transition: background-color var(--transition-normal);
+}
+
+.navbar-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: var(--container-wide-width);
+    margin: 0 auto;
+    padding: 0 clamp(var(--space-4), 4vw, var(--space-12));
+}
+
+/* Brand */
+.navbar-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-decoration: none;
+}
+
+.navbar-brand:hover {
+    text-decoration: none;
+}
+
+.brand-name {
+    font-family: var(--font-display);
+    font-size: var(--text-heading-sm);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.brand-sub {
+    font-family: var(--font-mono);
+    font-size: var(--text-mono-xs);
+    letter-spacing: 0.25em;
+    color: var(--text-muted);
+    line-height: 1;
+}
+
+/* Nav Links List */
+.navbar-links {
+    display: flex;
+    gap: var(--space-8);
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.nav-link {
+    font-family: var(--font-mono);
+    font-size: var(--text-mono-sm);
+    letter-spacing: 0.18em;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+    position: relative;
+    padding: var(--space-2) 0;
+    cursor: pointer;
+}
+
+/* Underline Indicator */
+.nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background-color: var(--accent-bright);
+    box-shadow: 0 0 8px rgba(158, 171, 82, 0.6);
+    transition: width var(--transition-normal);
+}
+
+.nav-link:hover {
+    color: var(--text-primary);
+    text-decoration: none;
+}
+
+.nav-link:hover::after {
+    width: 100%;
+}
+
+/* Active Section Scrollspy State */
+.nav-link.active {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.nav-link.active::after {
+    width: 100%;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .navbar-links {
+        gap: var(--space-4);
+    }
+
+    .nav-link {
+        font-size: var(--text-mono-xs);
+        letter-spacing: 0.12em;
+    }
+}
