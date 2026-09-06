@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 
-export const MissionUpload = () => {
+export const MissionUpload = ({ onFileSelected = () => { } }) => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isDragOver, setIsDragOver] = useState(false);
     const fileInputRef = useRef(null);
@@ -9,6 +9,7 @@ export const MissionUpload = () => {
         const file = e.target.files[0];
         if (file) {
             setSelectedFile(file);
+            onFileSelected(file);
         }
     };
 
@@ -26,7 +27,9 @@ export const MissionUpload = () => {
         e.preventDefault();
         setIsDragOver(false);
         if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            setSelectedFile(e.dataTransfer.files[0]);
+            const file = e.dataTransfer.files[0];
+            setSelectedFile(file);
+            onFileSelected(file);
         }
     };
 

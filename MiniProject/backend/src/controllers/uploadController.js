@@ -1,39 +1,32 @@
 import fs from 'node:fs/promises';
-import { initializeWorkflow } from '../services/workflow.service.js';
+import { startWorkflow } from '../services/workflow.service.js';
+import { successResponse, errorResponse } from '../utils/responseUtils.js';
 
 export const handleUpload = async (req, res) => {
     try {
         if (!req.file) {
-            return res.status(400).json({ error: "No file uploaded" });
+            return errorResponse(res, 'No file uploaded', 'MISSING_FILE', 400);
         }
 
         const filePath = req.file.path;
-
-        // Read file contents
         const fileContent = await fs.readFile(filePath, 'utf8');
 
         if (!fileContent || fileContent.trim() === '') {
-            return res.status(400).json({ error: "File is empty" });
+            return errorResponse(res, 'File is empty', 'EMPTY_FILE', 400);
         }
 
-        // Initialize the workflow using the extracted text
-        const workflowInitParams = initializeWorkflow(fileContent);
-
-        // We now keep the file permanently stored in the uploads directory
-        // as requested, instead of unlinking it automatically.
-
-        return res.status(201).json({
-            message: "File successfully processed and workflow initialized.",
-            workflowId: workflowInitParams.workflowId,
-            extractedText: fileContent,
-            status: workflowInitParams.status
-        });
-
+        return successResponse(
+            res,
+            {
+                filename: req.file.originalname || req.file.filename,
+                fileSize: req.file.size,
+                extractedText: fileContent
+            },
+            'File uploaded and processed successfully.',
+            200
+        );
     } catch (error) {
-        console.error("Upload processing error:", error);
-
-        // Ensure error logging but do not delete the file automatically.
-
-        return res.status(500).json({ error: "Failed to process uploaded file." });
+        console.error('Upload processing error:', error);
+        return errorResponse(res, 'Failed to process uploaded file.', 'UPLOAD_ERROR', 500);
     }
 };

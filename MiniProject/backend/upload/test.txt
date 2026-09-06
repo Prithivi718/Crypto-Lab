@@ -126,10 +126,3 @@ Content-Type: application/json
 {
     "message": "TOP SECRET: Mission Alpha. Deliver package at 0300 hrs."
 }
-
-Secure communication channel initialized.
-Authentication of the sender has been verified.
-A shared session key is established securely.
-The message is encrypted using AES-256-GCM.
-The encrypted packet is digitally signed for integrity.
-Secure transmission completed successfully.

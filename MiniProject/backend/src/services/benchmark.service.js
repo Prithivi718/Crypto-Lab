@@ -1,126 +1,121 @@
-import {
-    generateEdKeys,
-    keyExchange,
-    deriveSessionKey,
-    generateRSAKeys,
-    wrapSessionKey,
-    encryptMessage,
-    createSignedData,
-    signEd25519,
-    verifyEd25519,
-    unwrapSessionKey,
-    decryptMessage
-} from "./crypto.service.js";
-import { measureAsync, measureSync } from '../utils/timingUtils.js';
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { config } from '../config/config.js';
+/**
+ * benchmark.service.js
+ * Analysis layer for SecureNet execution contexts.
+ * Performs timing, throughput, size, and efficiency analysis over ALREADY COLLECTED
+ * execution measurements. Does NOT execute cryptographic primitives or rerun crypto.
+ */
 
-export const runBenchmarkProcess = async (message, inputFilename = "input.txt") => {
+/**
+ * Analyzes a completed or running Execution Context.
+ * @param {Object} executionContext - The Execution Context to analyze
+ * @returns {Object} Analytical summary of the execution's performance and sizes
+ */
+export const analyzeExecution = (executionContext) => {
+    if (!executionContext) {
+        throw new Error('Execution Context is required for benchmark analysis');
+    }
 
-    // Overall start
-    const totalStart = performance.now();
+    const { executionId, input, measurements, verification, status } = executionContext;
+    const times = measurements?.times || {};
+    const sizes = measurements?.sizes || {};
 
-    const reportData = {
-        metrics: {
-            inputSize: Buffer.byteLength(message, 'utf8'),
-            inputFilename,
-            times: {},
-            sizes: {},
-            status: {}
-        },
-        packet: {}
+    // Extract individual operation durations
+    const opTimes = {
+        ed25519Gen: times.ed25519Gen || 0,
+        ecdhExchange: times.ecdhExchange || 0,
+        hkdfDerivation: times.hkdfDerivation || 0,
+        rsaGen: times.rsaGen || 0,
+        rsaWrap: times.rsaWrap || 0,
+        aesEncryption: times.aesEncryption || 0,
+        ed25519Sign: times.ed25519Sign || 0,
+        ed25519Verify: times.ed25519Verify || 0,
+        rsaUnwrap: times.rsaUnwrap || 0,
+        aesDecryption: times.aesDecryption || 0
     };
 
-    try {
-        // ENCRYPTION PHASE
+    // Group encryption vs decryption phase timing
+    const encryptionPhaseTime = parseFloat(
+        (
+            opTimes.ed25519Gen +
+            opTimes.ecdhExchange +
+            opTimes.hkdfDerivation +
+            opTimes.rsaGen +
+            opTimes.rsaWrap +
+            opTimes.aesEncryption +
+            opTimes.ed25519Sign
+        ).toFixed(4)
+    );
 
-        // 1. Ed25519
-        const { result: edKeys, durationMs: edTime } = await measureAsync('Generate Ed25519', () => generateEdKeys());
-        reportData.metrics.times.ed25519Gen = edTime;
+    const decryptionPhaseTime = parseFloat(
+        (
+            opTimes.ed25519Verify +
+            opTimes.rsaUnwrap +
+            opTimes.aesDecryption
+        ).toFixed(4)
+    );
 
-        // 2. ECDH
-        const { result: ecdhData, durationMs: ecdhTime } = measureSync('ECDH Exchange', () => keyExchange());
-        reportData.metrics.times.ecdhExchange = ecdhTime;
-        reportData.metrics.status.sharedSecretsMatch = ecdhData.sharedSecretsMatch;
+    const totalElapsed = times.totalElapsed || parseFloat((encryptionPhaseTime + decryptionPhaseTime).toFixed(4));
 
-        // 3. HKDF (using BaseA shared secret)
-        const { result: sessionKey, durationMs: hkdfTime } = await measureAsync('HKDF Derivation', () => deriveSessionKey(ecdhData.baseASharedSecret));
-        reportData.metrics.times.hkdfDerivation = hkdfTime;
-        reportData.metrics.sizes.sessionKey = sessionKey.byteLength;
+    // Determine fastest and slowest cryptographic operations
+    const validOps = Object.entries(opTimes).filter(([, time]) => typeof time === 'number' && time > 0);
+    let fastestOperation = { name: 'N/A', durationMs: 0 };
+    let slowestOperation = { name: 'N/A', durationMs: 0 };
 
-        // 4. RSA
-        const { result: rsaKeys, durationMs: rsaGenTime } = await measureAsync('RSA Gen', () => generateRSAKeys());
-        reportData.metrics.times.rsaGen = rsaGenTime;
-
-        const { result: wrappedSessionKey, durationMs: rsaWrapTime } = await measureAsync('RSA Wrap', () => wrapSessionKey(sessionKey, rsaKeys.rsaPublicKey));
-        reportData.metrics.times.rsaWrap = rsaWrapTime;
-        reportData.metrics.sizes.wrappedSessionKey = wrappedSessionKey.byteLength;
-
-        // 5. AES Encryption
-        const { result: encrypted, durationMs: aesEncTime } = measureSync('AES Encryption', () => encryptMessage(message, sessionKey));
-        reportData.metrics.times.aesEncryption = aesEncTime;
-        reportData.metrics.sizes.ciphertext = encrypted.ciphertext.byteLength;
-        reportData.metrics.sizes.iv = encrypted.iv.byteLength;
-        reportData.metrics.sizes.authTag = encrypted.authTag.byteLength;
-
-        // 6. Packet Signing
-        const { result: signedDataString, durationMs: createDataTime } = measureSync('Create Signed Data', () => createSignedData({
-            senderId: "BASE-A",
-            ecdhPublicKey: ecdhData.baseAPublicKey,
-            wrappedSessionKey,
-            ciphertext: encrypted.ciphertext,
-            iv: encrypted.iv,
-            authTag: encrypted.authTag
-        }));
-
-        const { result: signature, durationMs: signTime } = await measureAsync('Ed25519 Sign', () => signEd25519(signedDataString, edKeys.edPrivateKey));
-        reportData.metrics.times.ed25519Sign = signTime;
-        reportData.metrics.sizes.signature = signature.byteLength;
-
-        // DECRYPTION PHASE
-
-        // 7. Verify Signature
-        const { result: signatureValid, durationMs: verifyTime } = await measureAsync('Verify Signature', () => verifyEd25519(signedDataString, signature, edKeys.edPublicKey));
-        reportData.metrics.times.ed25519Verify = verifyTime;
-        reportData.metrics.status.signatureValid = signatureValid;
-
-        if (!signatureValid) throw new Error("Signature invalid");
-
-        // 8. RSA Unwrap
-        const { result: recoveredSessionKey, durationMs: rsaUnwrapTime } = await measureAsync('RSA Unwrap', () => unwrapSessionKey(wrappedSessionKey, rsaKeys.rsaPrivateKey));
-        reportData.metrics.times.rsaUnwrap = rsaUnwrapTime;
-
-        // 9. AES Decrypt
-        const { result: decrypted, durationMs: aesDecTime } = measureSync('AES Decryption', () => decryptMessage(encrypted.ciphertext, recoveredSessionKey, encrypted.iv, encrypted.authTag));
-        reportData.metrics.times.aesDecryption = aesDecTime;
-
-        if (!decrypted.success) throw new Error("Decryption failed");
-
-        reportData.metrics.status.decryptionSuccess = true;
-        reportData.metrics.status.plaintextMatch = (decrypted.plaintext === message);
-
-        const totalEnd = performance.now();
-        reportData.metrics.times.totalElapsed = parseFloat((totalEnd - totalStart).toFixed(4));
-        reportData.success = true;
-
-        // Save report to disk
-        const reportFilename = `report-${Date.now()}.json`;
-        const reportPath = path.join(config.dirs.reports, reportFilename);
-        await fs.writeFile(reportPath, JSON.stringify(reportData, null, 2), 'utf8');
-
-        return {
-            success: true,
-            reportFile: reportFilename,
-            report: reportData,
-            plaintext: decrypted.plaintext
-        };
-
-    } catch (error) {
-        return {
-            success: false,
-            error: error.message,
-            metricsSoFar: reportData.metrics
-        };
+    if (validOps.length > 0) {
+        validOps.sort((a, b) => a[1] - b[1]);
+        fastestOperation = { name: validOps[0][0], durationMs: validOps[0][1] };
+        slowestOperation = { name: validOps[validOps.length - 1][0], durationMs: validOps[validOps.length - 1][1] };
     }
+
+    // Calculate throughput (KB/sec) if totalElapsed > 0 and inputSize > 0
+    const inputSizeBytes = input?.size || sizes.inputSize || 0;
+    let throughputKBps = 0;
+    if (totalElapsed > 0 && inputSizeBytes > 0) {
+        const inputKB = inputSizeBytes / 1024;
+        const totalSeconds = totalElapsed / 1000;
+        throughputKBps = parseFloat((inputKB / totalSeconds).toFixed(2));
+    }
+
+    return {
+        executionId,
+        status,
+        timing: {
+            operations: opTimes,
+            encryptionPhaseMs: encryptionPhaseTime,
+            decryptionPhaseMs: decryptionPhaseTime,
+            totalElapsedMs: totalElapsed
+        },
+        sizes: {
+            inputSizeBytes,
+            sessionKeyBytes: sizes.sessionKey || 32,
+            wrappedSessionKeyBytes: sizes.wrappedSessionKey || 256,
+            ciphertextBytes: sizes.ciphertext || 0,
+            ivBytes: sizes.iv || 12,
+            authTagBytes: sizes.authTag || 16,
+            signatureBytes: sizes.signature || 64
+        },
+        verification: {
+            sharedSecretsMatch: verification?.sharedSecretsMatch || false,
+            signatureValid: verification?.signatureValid || false,
+            decryptionSuccess: verification?.decryptionSuccess || false,
+            plaintextMatch: verification?.plaintextMatch || false
+        },
+        analysis: {
+            fastestOperation: `${fastestOperation.name} (${fastestOperation.durationMs} ms)`,
+            slowestOperation: `${slowestOperation.name} (${slowestOperation.durationMs} ms)`,
+            encryptionVsDecryptionRatio: decryptionPhaseTime > 0
+                ? parseFloat((encryptionPhaseTime / decryptionPhaseTime).toFixed(2))
+                : 1,
+            throughputKBps
+        }
+    };
+};
+
+/**
+ * Legacy support for runBenchmarkProcess wrapper to preserve interface without running crypto directly.
+ */
+export const runBenchmarkProcess = async (message, inputFilename = 'input.txt') => {
+    throw new Error(
+        'runBenchmarkProcess is deprecated. Please execute process_run() from process.service.js instead.'
+    );
 };

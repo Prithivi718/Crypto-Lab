@@ -1,451 +1,1130 @@
-============================================================
-8. FILE UPLOAD CORE
-============================================================
+1. The architecture I recommend
 
-Create/complete:
+Think of the four services like this:
 
-uploadController.js
-uploadRoutes.js
+                    CRYPTO SERVICE
+                         │
+              actual cryptographic work
+                         │
+        ┌────────────────┴────────────────┐
+        │                                 │
+        ▼                                 ▼
+ WORKFLOW SERVICE                   PROCESS SERVICE
+ deep demonstration                complete execution
+ step-by-step                       encryption + decryption
+        │                                 │
+        └──────────────┬──────────────────┘
+                       │
+                 EXECUTION DATA
+                       │
+                       ▼
+                 BENCHMARK SERVICE
+              analyze collected metrics
+                       │
+                       ▼
+                  REPORT SERVICE
+             build final analysis/report
+                       │
+                       ▼
+                 OUTPUT / ANALYSIS
 
-The purpose is to let the frontend upload:
+And the roles become extremely simple:
 
-message.txt
+crypto.service.js
 
-The content of the uploaded file becomes the confidential plaintext.
+How to perform cryptography
+
+workflow.service.js
+
+How to demonstrate cryptography step by step
+
+process.service.js
+
+How to run the whole cryptographic operation in one shot
+
+benchmark.service.js
+
+How to analyze execution measurements
+
+report.service.js
+
+How to turn everything into the final human-readable report
+
+That is the separation I'd stick with.
+
+2. One important change to your idea
+
+You said:
+
+benchmark should be analyzing those metrics at each step or at complete algorithm, from a single function call.
+
+Yes.
+
+But I would not call benchmark.service.js from every crypto function.
+
+Instead, introduce one small lower-level timing/measurement mechanism.
+
+You already have:
+
+measureAsync()
+measureSync()
+
+in timingUtils.js, and your benchmark service is currently using them around every crypto operation.
+
+Use those as the measurement layer.
+
+Then:
+
+timingUtils
+    ↓
+collects raw timings
+    ↓
+execution context
+    ↓
+benchmark.service
+    ↓
+analyzes them
+
+So:
+
+Timing utility = stopwatch
+Benchmark service = analyst
+
+That's much cleaner than making Benchmark the stopwatch.
+
+3. Introduce an executionContext
+
+This is the missing piece.
+
+When either Workflow or Process begins, create an execution context.
+
+For example:
+
+{
+    executionId: "exec-123",
+
+    input: {
+        message: "...",
+        filename: "mission.txt",
+        size: 284
+    },
+
+    steps: [],
+
+    metrics: {
+        times: {},
+        sizes: {},
+        status: {}
+    },
+
+    cryptographicData: {
+        ed25519: {},
+        ecdh: {},
+        hkdf: {},
+        rsa: {},
+        aes: {},
+        signature: {}
+    }
+}
+
+This object becomes the single source of truth for that execution.
+
+4. What gets stored in this execution context
+
+This is where your confidential values go.
+
+For your demo, the execution context can contain:
+
+INPUT
+├── plaintext
+├── filename
+└── file size
+
+ED25519
+├── public key
+└── private key
+
+ECDH
+├── Base A public key
+├── Base B public key
+└── shared secret
+
+HKDF
+├── shared secret
+├── salt
+├── info
+└── session key
+
+RSA
+├── public key
+├── private key
+└── wrapped session key
+
+AES
+├── plaintext
+├── session key
+├── ciphertext
+├── IV
+└── auth tag
+
+SIGNATURE
+└── signature
+
+DECRYPTION
+├── recovered session key
+└── recovered plaintext
+
+VERIFICATION
+├── signature valid
+├── shared secret match
+├── decryption success
+└── plaintext match
+
+TIMING
+├── Ed25519 generation
+├── ECDH
+├── HKDF
+├── RSA generation
+├── RSA wrap
+├── AES encrypt
+├── signature
+├── signature verify
+├── RSA unwrap
+├── AES decrypt
+└── total
+
+Now Workflow and Process don't need separate data models.
+
+They can both contribute to the same execution structure.
+
+5. Your masking requirement should become one utility
+
+Yes — absolutely put this in utils.
+
+Something like:
+
+utils/
+└── maskSensitive.js
+
+The utility should support:
+
+maskSensitive(value)
 
 Example:
 
-message.txt
+Actual:
+fd44dd021993e0bb39097461
 
-TOP SECRET:
-Mission Alpha.
-Deliver package at 0300 hrs.
+Displayed:
+fd44********
 
-The backend must:
+Or, for a longer value:
 
-1. Receive multipart/form-data.
-2. Validate that a file exists.
-3. Ensure file type/extension is permitted.
-4. Ensure file size is within limits.
-5. Read the text content.
-6. Return the extracted plaintext or initialize workflow with it.
-7. Remove temporary uploaded file after the content is read.
-8. Never pass the file object directly into crypto.service.js.
+Actual:
+5a7e9c42c1d84f8a...
 
-The crypto layer should receive:
+Displayed:
+5a7e********
 
-message = file contents
+I would make the function configurable:
+
+maskSensitive(value, {
+    visible: 4,
+    maxVisibleLength: 10,
+    maskChar: "*"
+})
+
+But the important rule is:
+
+first 4 characters
++
+masked remainder
+
+For example:
+
+PRIVATE KEY
+7f91********
+
+PUBLIC KEY
+a81c********
+
+SHARED SECRET
+9e42********
+
+SESSION KEY
+31fd********
+
+For your report, keep both:
+
+{
+    raw: actualValue,
+    display: maskedValue
+}
+
+That is powerful because:
+
+backend retains actual value for report generation
+UI can show masked version
+exported report can choose what to display
+you don't repeatedly write masking logic everywhere
+6. Now your nine workflow responses become much better
+
+Your current response structure is already useful. For example, Step 1 currently only returns publicKeyFormat and keyReady.
+
+We change it to:
+
+Step 1 — Ed25519
+{
+  "step": 1,
+  "phase": "encryption",
+  "status": "completed",
+  "title": "Ed25519 Authentication",
+  "description": "Sender generating Ed25519 key pair for digital signature.",
+  "algorithm": "Ed25519",
+  "details": {
+    "publicKey": "7a3f********",
+    "publicKeyFormat": "JWK",
+    "keyReady": true
+  }
+}
+
+Only public key is returned.
+
+Private key remains in the execution context for the final report.
+
+7. Step 2 — ECDH
+
+Your current response only says whether the shared secrets match.
+
+Change it to:
+
+{
+  "step": 2,
+  "phase": "encryption",
+  "status": "completed",
+  "title": "ECDH Key Exchange",
+  "description": "Both bases generate keys and independently calculate the same shared secret.",
+  "algorithm": "ECDH",
+  "details": {
+    "baseAPublicKey": "04ab********",
+    "baseBPublicKey": "04f1********",
+    "sharedSecret": "98cd********",
+    "sharedSecretsMatch": true
+  }
+}
+
+That is exactly what you requested.
+
+8. Step 3 — HKDF
+
+Your current output gives only sessionKeyLength.
+
+Change it to:
+
+{
+  "step": 3,
+  "phase": "encryption",
+  "status": "completed",
+  "title": "HKDF Key Derivation",
+  "description": "Deriving 256-bit AES session key from the ECDH shared secret.",
+  "algorithm": "HKDF",
+  "details": {
+    "salt": "9e41********",
+    "hkdfInfo": "7365********",
+    "sessionKey": "bc72********",
+    "sessionKeyLength": 32
+  }
+}
+
+You specifically wanted the session key plus masked salt/HKDF values.
+
+Good.
+
+9. Step 4 — RSA-OAEP
+
+Your current response only gives wrapped-key length.
+
+Use:
+
+{
+  "step": 4,
+  "phase": "encryption",
+  "status": "completed",
+  "title": "RSA-OAEP Key Protection",
+  "description": "Wrapping AES session key with RSA public key.",
+  "algorithm": "RSA-OAEP",
+  "details": {
+    "publicKey": "MIIB********",
+    "wrappedSessionKey": "8fd2********",
+    "wrappedKeyLength": 256
+  }
+}
+
+No RSA private key here.
+
+Again, retain it internally for the report.
+
+10. Step 5 — AES-256-GCM
+
+Your current AES output is already structurally good: ciphertext, IV and authentication tag.
+
+Just change formatting:
+
+{
+  "step": 5,
+  "phase": "encryption",
+  "status": "completed",
+  "title": "AES-256-GCM Message Encryption",
+  "description": "Message encrypted using AES-256 session key.",
+  "algorithm": "AES-256-GCM",
+  "details": {
+    "ciphertextHex": "d06d********",
+    "ivHex": "fd44********",
+    "authTagHex": "dbecc32b********"
+  }
+}
+
+And importantly:
+
+actual ciphertext remains stored internally.
+
+Only the response representation is masked.
+
+11. Step 6 — Signature
+
+Your current response only gives signature length.
+
+Change to:
+
+{
+  "step": 6,
+  "phase": "encryption",
+  "status": "completed",
+  "title": "Packet Signing",
+  "description": "Creating secure packet and signing with Ed25519.",
+  "algorithm": "Ed25519",
+  "details": {
+    "signature": "a71f********",
+    "signatureLength": 64
+  }
+}
+12. Step 7 — Signature verification
+
+Leave it simple.
+
+Your current structure is already exactly what we need.
+
+{
+  "step": 7,
+  "phase": "decryption",
+  "status": "completed",
+  "title": "Signature Verification",
+  "description": "Receiver verifies Ed25519 signature.",
+  "algorithm": "Ed25519",
+  "details": {
+    "valid": true
+  }
+}
+
+No additional key material required in this step.
+
+13. Step 8 — RSA recovery
+
+Your current response only gives the recovered key length.
+
+Make it:
+
+{
+  "step": 8,
+  "phase": "decryption",
+  "status": "completed",
+  "title": "RSA Session Key Recovery",
+  "description": "Receiver recovers AES session key using RSA private key.",
+  "algorithm": "RSA-OAEP",
+  "details": {
+    "recoveredSessionKey": "bc72********",
+    "recoveredKeyLength": 32
+  }
+}
+
+This is useful because the report can explicitly show:
+
+Original Session Key
+       ↓
+RSA-OAEP wrapping
+       ↓
+Wrapped Session Key
+       ↓
+RSA-OAEP recovery
+       ↓
+Recovered Session Key
+
+MATCH ✓
+14. Step 9 — AES decryption
+
+Your current step returns plaintext.
+
+Keep plaintext.
+
+Add the session key:
+
+{
+  "step": 9,
+  "phase": "decryption",
+  "status": "completed",
+  "title": "AES-256-GCM Decryption",
+  "description": "Decrypting ciphertext and verifying auth tag.",
+  "algorithm": "AES-256-GCM",
+  "details": {
+    "sessionKey": "bc72********",
+    "plaintext": "Secure communication channel initialized.\r\nAuthentication of the sender has been verified.\r\nA shared session key is established securely.\r\nThe message is encrypted using AES-256-GCM.\r\nThe encrypted packet is digitally signed for integrity.\r\nSecure transmission completed successfully."
+  }
+}
+
+Perfect.
+
+15. What happens to the REAL keys?
+
+This is the important distinction:
+
+API step response
+
+Masked.
+
+Execution context
+
+Full values.
+
+Report service
+
+Has access to full values.
+
+Frontend display
+
+Can choose masked/full depending on what you're designing.
+
+That gives you the flexibility you want.
+
+For example:
+
+API:
+sessionKey = "bc72********"
+
+Internal:
+sessionKey = "bc72a8f1cc98...."
+
+Report:
+sessionKey = "bc72a8f1cc98...."
+
+Since this is a cryptography demonstration rather than a real production secure channel, that's reasonable for your project. But these should be demo-generated keys only, never real operational secrets.
+
+16. Now the Benchmark service
+
+Here's the biggest conceptual improvement.
+
+Don't have:
+
+Benchmark
+   ↓
+generate keys
+   ↓
+encrypt
+   ↓
+decrypt
+
+Instead:
+
+Process / Workflow
+       ↓
+perform operation
+       ↓
+measure operation
+       ↓
+store measurement
+       ↓
+Benchmark service analyzes it
+
+So benchmark receives something like:
+
+{
+    executionId: "...",
+
+    measurements: {
+        ed25519Gen: 4.9164,
+        ecdhExchange: 1.0047,
+        hkdfDerivation: 1.8473,
+        rsaGen: 189.7387,
+        rsaWrap: 1.0577,
+        aesEncryption: 0.837,
+        ed25519Sign: 0.5821,
+        ed25519Verify: 0.4396,
+        rsaUnwrap: 1.591,
+        aesDecryption: 0.3196
+    },
+
+    sizes: {
+        inputSize: 284,
+        sessionKey: 32,
+        wrappedSessionKey: 256,
+        ciphertext: 284,
+        iv: 12,
+        authTag: 16,
+        signature: 64
+    },
+
+    status: {
+        sharedSecretsMatch: true,
+        signatureValid: true,
+        decryptionSuccess: true,
+        plaintextMatch: true
+    }
+}
+
+The values match the kind of measurements your current benchmark already produces.
+
+17. Benchmark's job becomes analysis
+
+For example:
+
+analyzeExecution(executionContext)
+
+returns:
+
+{
+  "timing": {
+    "ed25519Generation": 4.9164,
+    "ecdh": 1.0047,
+    "hkdf": 1.8473,
+    "rsaGeneration": 189.7387,
+    "rsaWrap": 1.0577,
+    "aesEncryption": 0.837,
+    "ed25519Sign": 0.5821,
+    "ed25519Verify": 0.4396,
+    "rsaUnwrap": 1.591,
+    "aesDecryption": 0.3196
+  },
+
+  "totalExecutionTime": 202.8474,
+
+  "sizes": {
+    ...
+  },
+
+  "verification": {
+    ...
+  },
+
+  "analysis": {
+    "fastestOperation": "AES decryption",
+    "slowestOperation": "RSA key generation"
+  }
+}
+
+Now Benchmark is genuinely an analysis service.
+
+18. And this fixes your Pipeline telemetry
+
+Your screenshot has:
+
+TELEMETRY
+
+1.9ms
+LAST OPERATION
+
+CHANNEL
+AES-GCM / 256
+
+INTEGRITY
+NOMINAL
+
+Perfect.
+
+The Pipeline page does not need the entire benchmark object.
+
+It only gets:
+
+{
+    "lastOperation": "HKDF",
+    "durationMs": 1.8473
+}
+
+and renders:
+
+1.85 ms
+LAST OPERATION
+
+HKDF
+
+That's it.
+
+So:
+
+WORKFLOW
+   ↓
+time measurement
+   ↓
+telemetry
+   ↓
+pipeline UI
+
+while:
+
+execution data
+   ↓
+benchmark analysis
+   ↓
+report service
+   ↓
+analysis page
+
+Same measurement source.
+
+Different consumers.
+
+19. The report service should be the final aggregator
+
+This is exactly the job you've been describing.
+
+report.service.js gets:
+
+Execution Context
+        +
+Workflow steps
+        +
+Process result
+        +
+Benchmark analysis
+        ↓
+REPORT
+
+And creates a structure like:
+
+{
+  "summary": {
+    "executionId": "...",
+    "filename": "mission.txt",
+    "inputSize": 284,
+    "status": "SUCCESS"
+  },
+
+  "encryption": [
+    {
+      "step": 1,
+      "algorithm": "Ed25519",
+      "input": "...",
+      "process": "...",
+      "output": "..."
+    }
+  ],
+
+  "decryption": [
+    {
+      "step": 7,
+      "algorithm": "Ed25519",
+      "input": "...",
+      "process": "...",
+      "output": "..."
+    }
+  ],
+
+  "cryptographicMaterial": {
+    ...
+  },
+
+  "benchmark": {
+    ...
+  },
+
+  "verification": {
+    ...
+  }
+}
+
+This then becomes the source for:
+
+Analysis UI
+       +
+TXT export
+       +
+PDF export
+20. The most important part: Report should NOT rerun the algorithm
+
+This answers your biggest question.
+
+You asked:
+
+report.service.js can use the same benchmark.service.js again to gain those input, process, and output or can track and store responses when workflow/process is runned.
+
+Choose the second approach.
+
+Store/collect during execution.
+
+Do NOT rerun crypto during report generation.
+
+So:
+
+Workflow/Process executes
+        ↓
+captures data
+        ↓
+stores execution context
+        ↓
+Analysis page requests report
+        ↓
+Report service reads stored execution
+        ↓
+Benchmark service analyzes stored timings
+        ↓
+Report assembled
+
+That means the report describes the actual execution that just occurred.
+
+Not a second execution.
+
+That's a major difference.
+
+21. Final route structure
+
+Now the routes become wonderfully small.
+
+Upload
+POST /api/upload
+Workflow
+POST /api/workflow/start
+POST /api/workflow/step
+GET  /api/workflow/:workflowId
+POST /api/workflow/reset
+
+Purpose:
+
+interactive educational demonstration
+
+Process
+POST /api/process/run
+GET  /api/process/:executionId
+
+Purpose:
+
+complete encryption + decryption
+
+And processController.js must call:
+
+process_run()
 
 not:
 
-message = filename
+runBenchmarkProcess()
 
-============================================================
-9. uploadController.js
-============================================================
+because the latter is exactly what your current controller is doing incorrectly.
 
-The controller should orchestrate:
+Benchmark
 
-request
-    ↓
-Multer-provided file
-    ↓
-fileUtils
-    ↓
-read file
-    ↓
-plaintext content
-    ↓
-return safe response
+No frontend route required.
 
-The controller should not contain low-level fs operations wherever reusable helpers can be used.
+That is important.
 
-============================================================
-10. uploadRoutes.js
-============================================================
+Don't expose:
 
-Create:
+POST /api/benchmark/run
 
-POST /api/upload
+for the current architecture.
 
-Use the existing upload middleware.
+Instead:
 
-Example conceptual flow:
+report.service
+       ↓
+benchmark.service
+       ↓
+analyze execution metrics
 
-POST /api/upload
-    ↓
-uploadMiddleware
-    ↓
-uploadController
-    ↓
-fileUtils.readTextFile()
-    ↓
-safe response
+Benchmark is an internal service.
 
-============================================================
-11. fileUtils.js — SUPPORTING CORE UTILITY
-============================================================
+Report
+GET /api/report/:executionId
 
-Create:
+Potentially later:
 
-backend/src/utils/fileUtils.js
+GET /api/report/:executionId/txt
+GET /api/report/:executionId/pdf
 
-This should contain reusable file operations.
+But those can come after the report structure is working.
 
-Responsibilities:
+22. Final execution flow — Process button
 
-- read text file
-- delete temporary file
-- validate extension
-- validate file size
-- obtain file metadata
-- optionally sanitize/normalize file handling
+Your Mission page:
 
-Examples:
+RUN ALGORITHM
+       ↓
+POST /api/process/run
+       ↓
+processController
+       ↓
+process.service
+       ↓
+crypto.service
+       ↓
+ENCRYPT
+       ↓
+DECRYPT
+       ↓
+VERIFY
+       ↓
+ExecutionContext stored
+       ↓
+executionId returned
+       ↓
+/analysis/:executionId
 
-readTextFile(path)
-deleteFile(path)
-validateTextFile(file)
-getFileMetadata(file)
+Then:
 
-Do not duplicate these functions in controllers.
+GET /api/report/:executionId
+       ↓
+report.service
+       ↓
+load execution context
+       ↓
+benchmark.service
+       ↓
+analyze timing + sizes + status
+       ↓
+combine with crypto data
+       ↓
+FINAL REPORT
+23. Workflow button flow
 
+The other button:
 
-============================================================
-16. errorMiddleware.js — SUPPORT SYSTEM
-============================================================
+RUN SECURE DEMONSTRATION
+       ↓
+POST /api/workflow/start
+       ↓
+workflowId
+       ↓
+/pipeline/:workflowId
 
-Create/complete:
+Then each step:
 
-backend/src/middleware/errorMiddleware.js
+POST /api/workflow/step
 
-Purpose:
+       ↓
 
-Centralize backend errors.
+Step executes
 
-It should provide a consistent error shape.
+       ↓
 
-Example:
+Timing captured
 
+       ↓
+
+Step result returned
+
+       ↓
+
+Pipeline telemetry updated
+
+At the end:
+
+Workflow complete
+       ↓
+execution context retained
+       ↓
+Analysis
+       ↓
+Report service
+       ↓
+Benchmark analysis
+
+So both routes eventually produce an analysable execution.
+
+24. One shared internal structure
+
+This is the part that will save you a TON of backend pain.
+
+Have one execution record:
+
+Execution
 {
-    success: false,
-    error: "Invalid workflow step",
-    code: "WORKFLOW_STEP_INVALID"
+    id,
+
+    input,
+
+    workflow: {
+        steps: []
+    },
+
+    process: {
+        encryption: {},
+        decryption: {}
+    },
+
+    cryptographicMaterial: {},
+
+    measurements: {},
+
+    verification: {},
+
+    benchmark: null,
+
+    report: null
 }
 
-Handle:
-- validation failures
-- workflow errors
-- upload errors
-- file errors
-- cryptographic errors
-- missing resources
-- malformed requests
+Workflow fills:
 
-Controllers should not all reinvent error formatting.
+workflow.steps
 
-============================================================
-17. responseUtils.js — SUPPORT SYSTEM
-============================================================
+Process fills:
 
-Create:
+process
+cryptographicMaterial
+measurements
+verification
 
-backend/src/utils/responseUtils.js
+Benchmark fills:
 
-Purpose:
+benchmark
 
-Standardize responses.
+Report fills:
 
-Conceptually:
+report
 
-successResponse()
-errorResponse()
-workflowStepResponse()
-uploadResponse()
-processResponse()
+No service steals another service's responsibilities.
 
-All APIs should follow a predictable response format.
+25. The final responsibility table
+Service	Job	Runs Crypto?	Measures?	Analyzes?	Generates Report?
+crypto.service	actual algorithms	✅	through timing wrapper	❌	❌
+workflow.service	step-by-step demo	✅ via crypto	✅ records	❌	❌
+process.service	complete execution	✅ via crypto	✅ records	❌	❌
+benchmark.service	analyze measurements	❌	❌	✅	❌
+report.service	final explanation	❌	❌	uses benchmark	✅
 
-This makes frontend development much easier because React doesn't have to understand five different JSON structures.
+That is the architecture I'd lock in.
 
-============================================================
-18. timingUtils.js — METRICS FOUNDATION
-============================================================
+26. One small correction to your wording
 
-Create:
+You called Benchmark the “parent of time tracking.”
 
-backend/src/utils/timingUtils.js
+I'd reverse that.
 
-This is a supporting utility that will later power benchmarkService.js.
+Use:
 
-Provide reusable timing functions.
+timingUtils
+     ↓
+TIME TRACKING
+     ↓
+execution measurements
+     ↓
+benchmark.service
+     ↓
+METRIC ANALYSIS
 
-Concept:
+Because measureSync() and measureAsync() are infrastructure-level utilities. Your current benchmark service already demonstrates this pattern by wrapping operations with them.
 
-startTimer()
-    ↓
-execute operation
-    ↓
-stopTimer()
-    ↓
-durationMs
+So Benchmark becomes the consumer/analyst of timing, not the parent of timing.
 
-Use a high-resolution timing source appropriate for Node.js.
+27. And your Output page can finally become exactly what you pictured
 
-The timing utility should not know anything about AES, RSA, or other specific algorithms.
+Something like:
 
-It simply measures elapsed execution time.
+SECURE TRANSMISSION ANALYSIS
 
-Example concept:
+MISSION FILE
+mission-alpha.txt
+284 bytes
 
-measureAsync("HKDF", async () => {
-    ...
-})
+────────────────────────────────────────
 
-or equivalent architecture.
+ENCRYPTION
 
-The workflow can use timingUtils to record:
+01 / ED25519 AUTHENTICATION
 
-- Ed25519 time
-- ECDH time
-- HKDF time
-- RSA time
-- AES time
-- signing time
-- verification time
-- total encryption time
-- total decryption time
+INPUT
+Sender identity
 
-============================================================
-19. CONFIGURATION — config.js + .env
-============================================================
+PROCESS
+Generate Ed25519 signing key pair
 
-Create/complete:
+OUTPUT
+Public Key: 7a3f********
 
-backend/src/config/config.js
+STATUS ✓
 
-backend/.env
 
-Centralize configuration such as:
+02 / ECDH KEY EXCHANGE
 
-PORT
-NODE_ENV
-UPLOAD_DIR
-REPORT_DIR
-MAX_FILE_SIZE
-ALLOWED_FILE_TYPES
-BENCHMARK_ITERATIONS
-WORKFLOW_TIMEOUT
+INPUT
+Base A + Base B key pairs
 
-Do not scatter these constants throughout the codebase.
+PROCESS
+Calculate shared secret
 
-Example:
+OUTPUT
+Base A Public: 04ab********
+Base B Public: 04f1********
+Shared Secret: 98cd********
 
-.env
+STATUS ✓
 
-PORT=3000
-UPLOAD_DIR=uploads
-REPORT_DIR=reports
-MAX_FILE_SIZE=...
-NODE_ENV=development
 
-config.js should read and expose them to the application.
-
-============================================================
-20. SECURITY / VALIDATION SUPPORT
-============================================================
-
-Add validation wherever necessary.
-
-INPUT VALIDATION:
-
-- missing message
-- empty message
-- missing workflowId
-- invalid workflowId
-- invalid step
-- invalid phase
-- unsupported file
-- empty file
-- oversized file
-
-FILE VALIDATION:
-
-- only supported text format
-- size limit
-- temporary filename safety
-- deletion after processing
-
-WORKFLOW VALIDATION:
-
-- no skipped prerequisites
-- no invalid step transitions
-- no execution after workflow completion
-- reject unknown workflow
-
-CRYPTO DATA HANDLING:
-
-Do not expose sensitive private keys unnecessarily.
-
-Do not log raw:
-- private keys
-- session keys
-- shared secrets
-
-For the frontend, show safe values such as:
-
-Session Key:
-A8 32 4F ... 19 C2
-Length: 32 bytes
-
-rather than dumping sensitive values unnecessarily.
-
-============================================================
-21. IMPORTANT STATE-LIFETIME DECISION
-============================================================
-
-For the current college project, an in-memory workflow store is acceptable.
-
-Example conceptual structure:
-
-Map<workflowId, workflowState>
-
-However:
-
-- workflowId must be unique
-- workflow must be retrievable
-- reset must remove it
-- invalid IDs must be handled
-- state must not accidentally leak between workflows
-
-Do not introduce a database unless required.
-
-============================================================
-22. COMPLETE BACKEND FLOW
-============================================================
-
-The finished backend should allow this:
-
-USER
- ↓
-Uploads message.txt
- ↓
-POST /api/upload
- ↓
-Multer
- ↓
-uploadController
- ↓
-fileUtils
- ↓
-plaintext extracted
- ↓
-POST /api/workflow/start
- ↓
-workflow.service initializes state
- ↓
-workflowId returned
- ↓
-FRONTEND
- ↓
-user clicks NEXT
- ↓
-POST /api/workflow/step
- ↓
-workflowController
- ↓
-workflow.service
- ↓
-crypto.service.js
- ↓
-one algorithm executes
- ↓
-result stored in workflow state
- ↓
-safe step result returned
- ↓
-frontend displays it
- ↓
-user clicks NEXT
- ↓
-repeat
-
-And if the user clicks the whole process written in the process.service.js, to execute complete algorithm
-Build the backend so the Workflow is used only for step-by-step educational explanation and execution navigation, 
-showing what each algorithm does and how the cryptographic process progresses, without detailed benchmarking or 
-performance metrics. The Process service should execute the complete encryption → packet/authentication → decryption pipeline 
-in one run and produce the complete raw execution result. 
-After the process finishes, create a separate Output/Analysis result layer that consumes the completed process
-result and presents measurable metrics such as input filename, file size, plaintext content size in bytes, 
-ciphertext size, key/parameter sizes, per-algorithm execution time, total encryption time, total decryption time, 
-and overall execution time. The final output should clearly show authentication/signature verification, integrity 
-verification, original vs recovered message, and whether the complete process passed or failed. Keep sensitive 
-cryptographic material masked while exposing safe metrics and representations suitable for charts, tables, and 
-project presentation. 
-This output layer should be independent from workflow.service.js so the workflow remains clean and 
-focused on explaining the cryptographic process.
-
-============================================================
-23. FRONTEND DESIGN PROMPT
-============================================================
-
-You can use the following prompt to instruct a frontend agent or developer to build the React application against the completed backend:
-
-```text
-You are building the React + Vite frontend for the "Secure Defence Communication Network".
-
-The backend is fully complete. It exposes a step-by-step interactive workflow engine as well as a monolithic benchmarking engine. 
-Your goal is to build a modern, high-end, dark-themed UI that visually explains how the cryptographic pipeline works.
-
-Here is the exact API surface you have available:
-
-1. FILE UPLOAD
-POST /api/upload
-- Body: multipart/form-data with a `file` field containing a .txt file.
-- Response: { workflowId, extractedText, message }
-- Purpose: Starting point of the app. User drops "message.txt", you get the workflowId.
-
-2. WORKFLOW STEP EXECUTION
-POST /api/workflow/step
-- Body: { workflowId: <uuid>, step: <number> }
-- Response: { step, phase, algorithm, title, description, details: { ...safe_info } }
-- Purpose: Execute a specific step (1-6 for Encryption, 7-9 for Decryption).
-
-3. WORKFLOW STATE INQUIRY
-GET /api/workflow/:workflowId
-- Response: { workflowId, currentStep, summary: { hasEd25519: true... } }
-- Purpose: Restore UI state if needed, or track overall progress.
-
-4. MONOLITHIC BENCHMARK
-POST /api/process/run
-- Body: { message: "the plaintext" }
-- Response: { success: true, report: { metrics: { times, sizes, status }, packet } }
-- Purpose: For generating analytics charts (how fast was AES vs RSA, what are the payload sizes).
-
---- UI/UX REQUIREMENTS ---
-
-1. AESTHETICS:
-- Use a stunning Cyber/Defence dark mode (deep blues, neon accents, glassmorphism).
-- Smooth transitions between views. It should feel like a premium military or enterprise security dashboard.
-
-2. VIEW 1: The Dropzone
-- A massive, sleek dropzone in the center of the screen accepting `.txt` files.
-- Upon upload, call `/api/upload`. Extract the `workflowId` and transition to the Interactive Workflow screen.
-
-3. VIEW 2: The Interactive Timeline (The core feature)
-- Top bar: A horizontal stepper showing steps 1 through 9.
-- Left column: The "Packet State" sidebar. Use the `summary` from `/api/workflow/:id` to light up indicators (e.g. "AES Key: [ LOCKED ]" -> "AES Key: [ DERIVED ]").
-- Center pane: The Active Step Viewer.
-  - When the user presses the glowing "EXECUTE NEXT STEP" button, call `/api/workflow/step` with the appropriate number.
-  - Show a loading spinner (simulating heavy math).
-  - When the response comes back, elegantly render the `title`, `description`, and the safe masked `details` (like Hex outputs or byte lengths) handed back by the API.
-
-4. VIEW 3: The Analytics Dashboard
-- A separate tab for "System Benchmark".
-- Accepts a text input. Posts to `/api/process/run`.
-- Renders Beautiful Charts (e.g., using Recharts) based on the `metrics` object. 
-- Bar chart comparing the execution time of Ed25519 vs RSA vs AES.
-- Data table representing payload expansions (Original file size vs Ciphertext size).
-
-Build this using React, standard CSS (or Tailwind if preferred), and ensure the UI never fakes the state—it must rely exclusively on the API responses.
-```
+03 / HKDF KEY DERIVATION
+
+INPUT
+ECDH shared secret
+
+PROCESS
+Derive session key
+
+OUTPUT
+Salt: 9e41********
+HKDF Info: 7365********
+Session Key: bc72********
+
+STATUS ✓
+
+...
+
+────────────────────────────────────────
+
+DECRYPTION
+
+07 / SIGNATURE VERIFICATION
+...
+
+08 / RSA SESSION KEY RECOVERY
+Recovered Session Key: bc72********
+
+09 / AES-256-GCM DECRYPTION
+Session Key: bc72********
+
+PLAINTEXT
+[full plaintext]
+
+────────────────────────────────────────
+
+PERFORMANCE ANALYSIS
+
+Ed25519      4.9164 ms
+ECDH         1.0047 ms
+HKDF         1.8473 ms
+RSA Gen      189.7387 ms
+RSA Wrap     1.0577 ms
+AES Encrypt  0.8370 ms
+...
+
+TOTAL        202.8474 ms
+
+────────────────────────────────────────
+
+FINAL VERIFICATION
+
+SIGNATURE       ✓
+SHARED SECRET   ✓
+DECRYPTION      ✓
+PLAINTEXT MATCH ✓
+
+TRANSMISSION VERIFIED
+
+That is much closer to the exact thing you've been trying to build.
+
+And because the report is generated from the same execution context, the keys, ciphertext, plaintext, packet information, step descriptions, verification results, and timing data all belong to one single cryptographic execution rather than being stitched together from multiple runs.
+
+One final implementation rule I would keep: don't store this execution state only in random local variables across services. For the current college demo, an in-memory Map<executionId, executionContext> is perfectly adequate; later you can replace it with a database without changing the service contracts.

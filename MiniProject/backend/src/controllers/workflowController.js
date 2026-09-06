@@ -1,25 +1,24 @@
 // workflowController.js
-
 import {
-    initializeWorkflow,
+    startWorkflow as serviceStartWorkflow,
+    executeStep as serviceExecuteStep,
     getWorkflowState,
-    runEncryptionStep,
-    runDecryptionStep,
     resetWorkflow
 } from '../services/workflow.service.js';
+import { successResponse, errorResponse, workflowStepResponse } from '../utils/responseUtils.js';
 
 export const startWorkflow = (req, res) => {
     try {
-        const { message } = req.body;
+        const { message, filename, fileSize } = req.body;
 
         if (!message) {
-            return res.status(400).json({ error: "Message is required to start workflow." });
+            return errorResponse(res, 'Message is required to start workflow.', 'MISSING_MESSAGE', 400);
         }
 
-        const result = initializeWorkflow(message);
-        return res.status(201).json(result);
+        const result = serviceStartWorkflow({ message, filename, fileSize });
+        return successResponse(res, result, 'Workflow session initialized successfully', 201);
     } catch (error) {
-        return res.status(500).json({ error: error.message });
+        return errorResponse(res, error.message, 'WORKFLOW_INIT_FAILED', 500);
     }
 };
 
@@ -28,29 +27,19 @@ export const getState = (req, res) => {
         const { id } = req.params;
         const state = getWorkflowState(id);
 
-        // Strip out any sensitive private keys before sending to frontend
-        const safeState = {
-            workflowId: state.workflowId,
-            currentStep: state.currentStep,
-            status: state.status,
-            completedSteps: state.completedSteps,
-            // Example of a safe summary to send without exposing secrets:
-            summary: {
-                hasEd25519: !!state.ed25519.edPublicKey,
-                hasSharedSecret: !!state.ecdh.baseASharedSecret,
-                hasSessionKey: !!state.hkdf.sessionKey,
-                hasWrappedKey: !!state.rsa.wrappedSessionKey,
-                hasCiphertext: !!state.aes.ciphertext,
-                hasPacketSignature: !!state.packet.signature,
-                hasSignatureVerified: !!state.decryption.signatureValid,
-                hasRecoveredKey: !!state.decryption.recoveredSessionKey,
-                hasPlaintext: !!state.decryption.plaintext
-            }
-        };
-
-        return res.status(200).json(safeState);
+        return successResponse(
+            res,
+            {
+                workflowId: state.workflowId,
+                executionId: state.executionId,
+                currentStep: state.currentStep,
+                status: state.status,
+                completedSteps: state.completedSteps
+            },
+            'Workflow state retrieved'
+        );
     } catch (error) {
-        return res.status(404).json({ error: error.message });
+        return errorResponse(res, error.message, 'WORKFLOW_NOT_FOUND', 404);
     }
 };
 
@@ -58,28 +47,24 @@ export const executeStep = async (req, res) => {
     try {
         const { workflowId, step } = req.body;
 
-        if (!workflowId || !step) {
-            return res.status(400).json({ error: "workflowId and step are required." });
+        if (!workflowId || step === undefined) {
+            return errorResponse(res, 'workflowId and step are required.', 'INVALID_INPUT', 400);
         }
 
         const stepNumber = parseInt(step, 10);
-        let result;
-
-        if (stepNumber >= 1 && stepNumber <= 6) {
-            result = await runEncryptionStep(workflowId, stepNumber);
-        } else if (stepNumber >= 7 && stepNumber <= 9) {
-            result = await runDecryptionStep(workflowId, stepNumber);
-        } else {
-            return res.status(400).json({ error: "Invalid step number." });
+        if (isNaN(stepNumber) || stepNumber < 1 || stepNumber > 9) {
+            return errorResponse(res, 'Step must be a number between 1 and 9.', 'INVALID_STEP', 400);
         }
 
-        if (result.status === "failed") {
-            return res.status(400).json(result);
+        const result = await serviceExecuteStep(workflowId, stepNumber);
+
+        if (result.status === 'failed') {
+            return errorResponse(res, result.error || 'Step execution failed', 'STEP_FAILED', 400);
         }
 
-        return res.status(200).json(result);
+        return workflowStepResponse(res, result);
     } catch (error) {
-        return res.status(500).json({ error: error.message });
+        return errorResponse(res, error.message, 'WORKFLOW_STEP_ERROR', 500);
     }
 };
 
@@ -89,9 +74,10 @@ export const reset = (req, res) => {
         const resetSuccess = resetWorkflow(id);
 
         if (resetSuccess) {
-            return res.status(200).json({ message: "Workflow reset successfully" });
+            return successResponse(res, { reset: true }, 'Workflow reset successfully');
         }
+        return errorResponse(res, 'Failed to reset workflow', 'RESET_FAILED', 400);
     } catch (error) {
-        return res.status(500).json({ error: error.message });
+        return errorResponse(res, error.message, 'RESET_ERROR', 500);
     }
 };
