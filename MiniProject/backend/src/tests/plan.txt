@@ -1,0 +1,451 @@
+============================================================
+8. FILE UPLOAD CORE
+============================================================
+
+Create/complete:
+
+uploadController.js
+uploadRoutes.js
+
+The purpose is to let the frontend upload:
+
+message.txt
+
+The content of the uploaded file becomes the confidential plaintext.
+
+Example:
+
+message.txt
+
+TOP SECRET:
+Mission Alpha.
+Deliver package at 0300 hrs.
+
+The backend must:
+
+1. Receive multipart/form-data.
+2. Validate that a file exists.
+3. Ensure file type/extension is permitted.
+4. Ensure file size is within limits.
+5. Read the text content.
+6. Return the extracted plaintext or initialize workflow with it.
+7. Remove temporary uploaded file after the content is read.
+8. Never pass the file object directly into crypto.service.js.
+
+The crypto layer should receive:
+
+message = file contents
+
+not:
+
+message = filename
+
+============================================================
+9. uploadController.js
+============================================================
+
+The controller should orchestrate:
+
+request
+    ↓
+Multer-provided file
+    ↓
+fileUtils
+    ↓
+read file
+    ↓
+plaintext content
+    ↓
+return safe response
+
+The controller should not contain low-level fs operations wherever reusable helpers can be used.
+
+============================================================
+10. uploadRoutes.js
+============================================================
+
+Create:
+
+POST /api/upload
+
+Use the existing upload middleware.
+
+Example conceptual flow:
+
+POST /api/upload
+    ↓
+uploadMiddleware
+    ↓
+uploadController
+    ↓
+fileUtils.readTextFile()
+    ↓
+safe response
+
+============================================================
+11. fileUtils.js — SUPPORTING CORE UTILITY
+============================================================
+
+Create:
+
+backend/src/utils/fileUtils.js
+
+This should contain reusable file operations.
+
+Responsibilities:
+
+- read text file
+- delete temporary file
+- validate extension
+- validate file size
+- obtain file metadata
+- optionally sanitize/normalize file handling
+
+Examples:
+
+readTextFile(path)
+deleteFile(path)
+validateTextFile(file)
+getFileMetadata(file)
+
+Do not duplicate these functions in controllers.
+
+
+============================================================
+16. errorMiddleware.js — SUPPORT SYSTEM
+============================================================
+
+Create/complete:
+
+backend/src/middleware/errorMiddleware.js
+
+Purpose:
+
+Centralize backend errors.
+
+It should provide a consistent error shape.
+
+Example:
+
+{
+    success: false,
+    error: "Invalid workflow step",
+    code: "WORKFLOW_STEP_INVALID"
+}
+
+Handle:
+- validation failures
+- workflow errors
+- upload errors
+- file errors
+- cryptographic errors
+- missing resources
+- malformed requests
+
+Controllers should not all reinvent error formatting.
+
+============================================================
+17. responseUtils.js — SUPPORT SYSTEM
+============================================================
+
+Create:
+
+backend/src/utils/responseUtils.js
+
+Purpose:
+
+Standardize responses.
+
+Conceptually:
+
+successResponse()
+errorResponse()
+workflowStepResponse()
+uploadResponse()
+processResponse()
+
+All APIs should follow a predictable response format.
+
+This makes frontend development much easier because React doesn't have to understand five different JSON structures.
+
+============================================================
+18. timingUtils.js — METRICS FOUNDATION
+============================================================
+
+Create:
+
+backend/src/utils/timingUtils.js
+
+This is a supporting utility that will later power benchmarkService.js.
+
+Provide reusable timing functions.
+
+Concept:
+
+startTimer()
+    ↓
+execute operation
+    ↓
+stopTimer()
+    ↓
+durationMs
+
+Use a high-resolution timing source appropriate for Node.js.
+
+The timing utility should not know anything about AES, RSA, or other specific algorithms.
+
+It simply measures elapsed execution time.
+
+Example concept:
+
+measureAsync("HKDF", async () => {
+    ...
+})
+
+or equivalent architecture.
+
+The workflow can use timingUtils to record:
+
+- Ed25519 time
+- ECDH time
+- HKDF time
+- RSA time
+- AES time
+- signing time
+- verification time
+- total encryption time
+- total decryption time
+
+============================================================
+19. CONFIGURATION — config.js + .env
+============================================================
+
+Create/complete:
+
+backend/src/config/config.js
+
+backend/.env
+
+Centralize configuration such as:
+
+PORT
+NODE_ENV
+UPLOAD_DIR
+REPORT_DIR
+MAX_FILE_SIZE
+ALLOWED_FILE_TYPES
+BENCHMARK_ITERATIONS
+WORKFLOW_TIMEOUT
+
+Do not scatter these constants throughout the codebase.
+
+Example:
+
+.env
+
+PORT=3000
+UPLOAD_DIR=uploads
+REPORT_DIR=reports
+MAX_FILE_SIZE=...
+NODE_ENV=development
+
+config.js should read and expose them to the application.
+
+============================================================
+20. SECURITY / VALIDATION SUPPORT
+============================================================
+
+Add validation wherever necessary.
+
+INPUT VALIDATION:
+
+- missing message
+- empty message
+- missing workflowId
+- invalid workflowId
+- invalid step
+- invalid phase
+- unsupported file
+- empty file
+- oversized file
+
+FILE VALIDATION:
+
+- only supported text format
+- size limit
+- temporary filename safety
+- deletion after processing
+
+WORKFLOW VALIDATION:
+
+- no skipped prerequisites
+- no invalid step transitions
+- no execution after workflow completion
+- reject unknown workflow
+
+CRYPTO DATA HANDLING:
+
+Do not expose sensitive private keys unnecessarily.
+
+Do not log raw:
+- private keys
+- session keys
+- shared secrets
+
+For the frontend, show safe values such as:
+
+Session Key:
+A8 32 4F ... 19 C2
+Length: 32 bytes
+
+rather than dumping sensitive values unnecessarily.
+
+============================================================
+21. IMPORTANT STATE-LIFETIME DECISION
+============================================================
+
+For the current college project, an in-memory workflow store is acceptable.
+
+Example conceptual structure:
+
+Map<workflowId, workflowState>
+
+However:
+
+- workflowId must be unique
+- workflow must be retrievable
+- reset must remove it
+- invalid IDs must be handled
+- state must not accidentally leak between workflows
+
+Do not introduce a database unless required.
+
+============================================================
+22. COMPLETE BACKEND FLOW
+============================================================
+
+The finished backend should allow this:
+
+USER
+ ↓
+Uploads message.txt
+ ↓
+POST /api/upload
+ ↓
+Multer
+ ↓
+uploadController
+ ↓
+fileUtils
+ ↓
+plaintext extracted
+ ↓
+POST /api/workflow/start
+ ↓
+workflow.service initializes state
+ ↓
+workflowId returned
+ ↓
+FRONTEND
+ ↓
+user clicks NEXT
+ ↓
+POST /api/workflow/step
+ ↓
+workflowController
+ ↓
+workflow.service
+ ↓
+crypto.service.js
+ ↓
+one algorithm executes
+ ↓
+result stored in workflow state
+ ↓
+safe step result returned
+ ↓
+frontend displays it
+ ↓
+user clicks NEXT
+ ↓
+repeat
+
+And if the user clicks the whole process written in the process.service.js, to execute complete algorithm
+Build the backend so the Workflow is used only for step-by-step educational explanation and execution navigation, 
+showing what each algorithm does and how the cryptographic process progresses, without detailed benchmarking or 
+performance metrics. The Process service should execute the complete encryption → packet/authentication → decryption pipeline 
+in one run and produce the complete raw execution result. 
+After the process finishes, create a separate Output/Analysis result layer that consumes the completed process
+result and presents measurable metrics such as input filename, file size, plaintext content size in bytes, 
+ciphertext size, key/parameter sizes, per-algorithm execution time, total encryption time, total decryption time, 
+and overall execution time. The final output should clearly show authentication/signature verification, integrity 
+verification, original vs recovered message, and whether the complete process passed or failed. Keep sensitive 
+cryptographic material masked while exposing safe metrics and representations suitable for charts, tables, and 
+project presentation. 
+This output layer should be independent from workflow.service.js so the workflow remains clean and 
+focused on explaining the cryptographic process.
+
+============================================================
+23. FRONTEND DESIGN PROMPT
+============================================================
+
+You can use the following prompt to instruct a frontend agent or developer to build the React application against the completed backend:
+
+```text
+You are building the React + Vite frontend for the "Secure Defence Communication Network".
+
+The backend is fully complete. It exposes a step-by-step interactive workflow engine as well as a monolithic benchmarking engine. 
+Your goal is to build a modern, high-end, dark-themed UI that visually explains how the cryptographic pipeline works.
+
+Here is the exact API surface you have available:
+
+1. FILE UPLOAD
+POST /api/upload
+- Body: multipart/form-data with a `file` field containing a .txt file.
+- Response: { workflowId, extractedText, message }
+- Purpose: Starting point of the app. User drops "message.txt", you get the workflowId.
+
+2. WORKFLOW STEP EXECUTION
+POST /api/workflow/step
+- Body: { workflowId: <uuid>, step: <number> }
+- Response: { step, phase, algorithm, title, description, details: { ...safe_info } }
+- Purpose: Execute a specific step (1-6 for Encryption, 7-9 for Decryption).
+
+3. WORKFLOW STATE INQUIRY
+GET /api/workflow/:workflowId
+- Response: { workflowId, currentStep, summary: { hasEd25519: true... } }
+- Purpose: Restore UI state if needed, or track overall progress.
+
+4. MONOLITHIC BENCHMARK
+POST /api/process/run
+- Body: { message: "the plaintext" }
+- Response: { success: true, report: { metrics: { times, sizes, status }, packet } }
+- Purpose: For generating analytics charts (how fast was AES vs RSA, what are the payload sizes).
+
+--- UI/UX REQUIREMENTS ---
+
+1. AESTHETICS:
+- Use a stunning Cyber/Defence dark mode (deep blues, neon accents, glassmorphism).
+- Smooth transitions between views. It should feel like a premium military or enterprise security dashboard.
+
+2. VIEW 1: The Dropzone
+- A massive, sleek dropzone in the center of the screen accepting `.txt` files.
+- Upon upload, call `/api/upload`. Extract the `workflowId` and transition to the Interactive Workflow screen.
+
+3. VIEW 2: The Interactive Timeline (The core feature)
+- Top bar: A horizontal stepper showing steps 1 through 9.
+- Left column: The "Packet State" sidebar. Use the `summary` from `/api/workflow/:id` to light up indicators (e.g. "AES Key: [ LOCKED ]" -> "AES Key: [ DERIVED ]").
+- Center pane: The Active Step Viewer.
+  - When the user presses the glowing "EXECUTE NEXT STEP" button, call `/api/workflow/step` with the appropriate number.
+  - Show a loading spinner (simulating heavy math).
+  - When the response comes back, elegantly render the `title`, `description`, and the safe masked `details` (like Hex outputs or byte lengths) handed back by the API.
+
+4. VIEW 3: The Analytics Dashboard
+- A separate tab for "System Benchmark".
+- Accepts a text input. Posts to `/api/process/run`.
+- Renders Beautiful Charts (e.g., using Recharts) based on the `metrics` object. 
+- Bar chart comparing the execution time of Ed25519 vs RSA vs AES.
+- Data table representing payload expansions (Original file size vs Ciphertext size).
+
+Build this using React, standard CSS (or Tailwind if preferred), and ensure the UI never fakes the state—it must rely exclusively on the API responses.
+```
