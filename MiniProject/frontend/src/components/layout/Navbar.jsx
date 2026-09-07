@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import logo from '../../assets/logo.png';
 import './Navbar.css';
 
 const NAV_ITEMS = [
@@ -65,8 +66,11 @@ export const Navbar = () => {
                     onClick={e => handleNavClick(e, 'mission')}
                     aria-label="SECURENET Home"
                 >
-                    <span className="brand-name">SECURENET</span>
-                    <span className="brand-sub">DEFENCE COMMUNICATIONS</span>
+                    <img src={logo} alt="SecureNet logo" className="brand-logo" />
+                    <div className="brand-text">
+                        <span className="brand-name">SECURENET</span>
+                        <span className="brand-sub">DEFENCE COMMUNICATIONS</span>
+                    </div>
                 </a>
 
                 {/* Links */}

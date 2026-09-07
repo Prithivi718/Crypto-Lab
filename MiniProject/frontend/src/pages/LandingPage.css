@@ -162,10 +162,28 @@
 /* RESPONSIVE RECOMPOSITION                     */
 /* ──────────────────────────────────────────── */
 
-/* Tablet */
-@media (max-width: 1024px) {
+/* Tablet and Lap (OMEN) */
+@media (max-width: 1500px) {
     .hero-content {
-        max-width: 600px;
+        max-width: 760px;
+        gap: var(--space-4);
+        transform: translate(-90px);
+    }
+
+    .hero-headline {
+        font-size: clamp(2rem, 4vw, 3rem);
+    }
+
+    .hero-description {
+        font-size: 0.95rem;
+    }
+
+    .hero-eyebrow {
+        font-size: 0.65rem;
+    }
+
+    .hero-tech-stack .type-mono-xs {
+        font-size: 0.6rem;
     }
 }
 

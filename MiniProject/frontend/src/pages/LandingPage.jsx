@@ -24,7 +24,7 @@ export default function LandingPage() {
                 <GridDistortion
                     imageSrc={landingImage}
                     grid={20}
-                    mouse={0.12}
+                    mouse={0.20}
                     strength={0.1}
                     relaxation={0.95}
                 />

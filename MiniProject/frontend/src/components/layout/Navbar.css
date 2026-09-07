@@ -29,9 +29,26 @@
 /* Brand */
 .navbar-brand {
     display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+    text-decoration: none;
+}
+
+.brand-logo {
+    height: 56px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+    flex-shrink: 0;
+    transform: translate(-16px);
+}
+
+.brand-text {
+    display: flex;
     flex-direction: column;
     gap: 2px;
-    text-decoration: none;
+    transform: translate(-16px);
 }
 
 .navbar-brand:hover {
