@@ -41,14 +41,14 @@
     display: block;
     object-fit: contain;
     flex-shrink: 0;
-    transform: translate(-16px);
+    transform: translate(-36px);
 }
 
 .brand-text {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    transform: translate(-16px);
+    transform: translate(-36px);
 }
 
 .navbar-brand:hover {
@@ -127,6 +127,26 @@
 }
 
 /* Mobile responsive */
+@media (max-width: 1500px) {
+    .navbar-links {
+        gap: var(--space-4);
+    }
+
+    .nav-link {
+        font-size: var(--text-mono-xs);
+        letter-spacing: 0.12em;
+    }
+
+    .brand-logo {
+        height: 56px;
+        width: auto;
+        display: block;
+        object-fit: contain;
+        flex-shrink: 0;
+        transform: translate(-16px);
+    }
+}
+
 @media (max-width: 768px) {
     .navbar-links {
         gap: var(--space-4);

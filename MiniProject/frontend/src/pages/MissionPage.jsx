@@ -7,8 +7,21 @@ import { CryptographicConcepts } from '../components/concepts/CryptographicConce
 import PipelinePage from './PipelinePage';
 import AnalysisPage from './AnalysisPage';
 import { startWorkflow, runProcess, uploadFile } from '../services/api';
+import { SecureNetIntro } from '../components/intro/SecureNetIntro';
 
 export default function MissionPage() {
+    // Intro overlay state — check sessionStorage
+    const [showIntro, setShowIntro] = useState(() => {
+        try {
+            return !sessionStorage.getItem('securenet-intro-seen');
+        } catch (err) {
+            return false;
+        }
+    });
+    const [isLogoHidden, setIsLogoHidden] = useState(false);
+    // Incremented on intro completion to force a fresh LandingPage/GridDistortion mount
+    const [landingKey, setLandingKey] = useState(0);
+
     // Workflow-specific state — controls the Pipeline only
     const [workflowId, setWorkflowId] = useState(null);
     const [workflowExecutionId, setWorkflowExecutionId] = useState(null);
@@ -119,11 +132,23 @@ export default function MissionPage() {
 
     return (
         <div className="mission-page">
+            {/* Cinematic SecureNet Boot & Intro Experience Overlay */}
+            {showIntro && (
+                <SecureNetIntro
+                    onStartTransition={() => setIsLogoHidden(true)}
+                    onIntroComplete={() => {
+                        setIsLogoHidden(false);
+                        setShowIntro(false);
+                        setLandingKey(k => k + 1); // Remount LandingPage so GridDistortion starts fresh
+                    }}
+                />
+            )}
+
             {/* Fixed Navbar with Scrollspy & Smooth Scroll */}
-            <Navbar />
+            <Navbar isLogoHidden={isLogoHidden} />
 
             {/* Section 0: Landing Hero with WebGL Grid Distortion background */}
-            <LandingPage />
+            <LandingPage key={landingKey} />
 
             {/* Section 1: Mission Intake Hero with ShapeGrid & Upload Panel */}
             <MissionIntake

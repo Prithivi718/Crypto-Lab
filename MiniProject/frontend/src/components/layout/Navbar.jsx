@@ -11,7 +11,7 @@ const NAV_ITEMS = [
     { id: 'analysis', label: 'ANALYSIS' }
 ];
 
-export const Navbar = () => {
+export const Navbar = ({ isLogoHidden }) => {
     const [activeSection, setActiveSection] = useState('home');
 
     useEffect(() => {
@@ -66,7 +66,13 @@ export const Navbar = () => {
                     onClick={e => handleNavClick(e, 'mission')}
                     aria-label="SECURENET Home"
                 >
-                    <img src={logo} alt="SecureNet logo" className="brand-logo" />
+                    <img
+                        id="navbar-brand-logo"
+                        src={logo}
+                        alt="SecureNet logo"
+                        className={`brand-logo${isLogoHidden ? ' logo-hidden' : ''}`}
+                        style={isLogoHidden ? { opacity: 0 } : undefined}
+                    />
                     <div className="brand-text">
                         <span className="brand-name">SECURENET</span>
                         <span className="brand-sub">DEFENCE COMMUNICATIONS</span>

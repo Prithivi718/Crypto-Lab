@@ -1,1039 +1,171 @@
-Absolutely. The issue is now clear enough that we can give Antigravity a **surgical frontend fix prompt** rather than another broad refactor.
+Yep. Give your coding agent this **exact prompt**:
 
-# Detailed Prompt — Fix Workflow → Analysis Execution State / Premature Report Fetch
+````text
+Fix the SecureNet intro → Home transition.
 
-Fix the current SecureNet frontend execution-state and Workflow → Analysis transition bug. **Do not redesign the existing UI, components, styling, or backend services. Modify existing files only where strictly required for this integration/state fix. Preserve all current functionality.**
+CURRENT PROBLEM:
+The project currently uses a separate `HomeBootReveal.jsx` component after the intro logo reaches the navbar. This creates a fake full-screen military/radar/grid reconstruction overlay. That is NOT what I want.
 
-## Current problem
+I do NOT want a new boot animation.
 
-The application currently mounts `AnalysisPage` inside `MissionPage` at the same time as `PipelinePage`. `MissionPage` stores the Workflow's `executionId` immediately when `/api/workflow/start` succeeds. This causes `AnalysisPage` to see an `executionId` **before any workflow step has executed** and immediately call:
+I want the EXISTING landing page's React Bits `GridDistortion` effect to perform the transition naturally.
 
-```text
-GET /api/report/:executionId
-```
+CURRENT REAL HOME IMPLEMENTATION:
+`LandingPage.jsx` already renders:
 
-The execution context is still in:
+```jsx
+<GridDistortion
+    imageSrc={landingImage}
+    grid={20}
+    mouse={0.20}
+    strength={0.1}
+    relaxation={0.95}
+/>
+````
 
-```text
-status = "running"
-```
+This existing `GridDistortion` is the visual effect that should be used for the Home reveal.
 
-because `executionStore.createExecution()` initially creates the execution with a running state.
+REQUIRED FINAL FLOW:
 
-As a result, the Analysis section is displaying:
-
-```text
-EXECUTION FAILED
-```
-
-while the Pipeline is still sitting at:
-
-```text
-01 / 09
-Step 01 Operation
-```
-
-This is not a real cryptographic failure. It is a frontend lifecycle/state-management problem caused by fetching the final report before Workflow completion.
-
----
-
-# 1. Fix the Workflow execution lifecycle
-
-Do NOT treat the `executionId` returned by:
-
-```text
-POST /api/workflow/start
-```
-
-as an Analysis-ready execution.
-
-When Workflow starts, store:
-
-```text
-workflowId
-workflowExecutionId
-```
-
-but do **not** make it available to `AnalysisPage` as the active report execution yet.
-
-Use separate state concepts such as:
-
-```js
-workflowId
-workflowExecutionId
-analysisExecutionId
-workflowComplete
-processRunData
-```
-
-Do not reuse one `executionId` state for every purpose.
-
----
-
-# 2. Workflow start behavior
-
-Current flow:
-
-```text
-RUN SECURE DEMONSTRATION
-        ↓
-POST /api/workflow/start
-        ↓
-workflowId + executionId
-        ↓
-set executionId
-        ↓
-AnalysisPage immediately fetches report
-```
-
-Change to:
-
-```text
-RUN SECURE DEMONSTRATION
-        ↓
-POST /api/workflow/start
-        ↓
-workflowId + workflowExecutionId
-        ↓
-show Pipeline
-        ↓
-DO NOT fetch Analysis yet
-```
-
-At this point:
-
-```text
-workflowComplete = false
-analysisExecutionId = null
-```
-
-The Pipeline may use `workflowId` and `workflowExecutionId`, but Analysis must remain in an inactive/empty state.
-
----
-
-# 3. Analysis must NOT fetch merely because an execution ID exists
-
-`AnalysisPage` currently uses:
-
-```js
-useEffect(() => {
-    if (!executionId) return;
-    getReport(executionId);
-}, [executionId]);
-```
-
-This behavior is too eager for Workflow mode.
-
-Change the contract so Analysis fetches a report only when it has an **analysis-ready execution ID**.
-
-The logic should conceptually be:
-
-```text
-No analysisExecutionId
-    ↓
-Do not call GET /api/report/:executionId
-
-analysisExecutionId exists
-    ↓
-GET /api/report/:executionId
-```
-
-Do not make Analysis fetch a report simply because Workflow has started.
-
----
-
-# 4. Process mode must still work immediately
-
-There are two execution modes and they must remain different.
-
-## Workflow
-
-```text
-POST /api/workflow/start
-        ↓
-9 individual workflow steps
-        ↓
-Step 9 completes
-        ↓
-analysisExecutionId becomes available
-        ↓
-Analysis fetch
-```
-
-## Process
-
-```text
-POST /api/process/run
-        ↓
-complete algorithm executes in one request
-        ↓
-executionId returned
-        ↓
-analysisExecutionId can immediately be set
-        ↓
-Analysis fetch
-```
-
-Do NOT delay Process Analysis unnecessarily because Process is already complete when its API response returns.
-
----
-
-# 5. Step execution must be authoritative
-
-Do not use:
-
-```text
-currentStep === 9
-```
-
-alone to determine Workflow completion.
-
-The source of truth must be the actual Step 9 API response.
-
-After calling:
-
-```text
-POST /api/workflow/step
-```
-
-for Step 9:
-
-1. Wait for the Promise to resolve.
-2. Check the actual response.
-3. Confirm:
-
-   ```js
-   response.step === 9
-   ```
-4. Confirm:
-
-   ```js
-   response.status === "completed"
-   ```
-5. Confirm the response belongs to the expected `workflowId`.
-6. Only then set:
-
-   ```text
-   workflowComplete = true
-   analysisExecutionId = response.executionId
-   ```
-
-Do not set completion before the response arrives.
-
-Do not infer completion from local UI state.
-
----
-
-# 6. Disable Next Step correctly after Step 9
-
-When Step 9 is successfully returned:
-
-```text
-step === 9
-AND
-status === "completed"
-```
-
-then:
-
-```text
-Execute Next Step
-```
-
-must become disabled.
-
-Display:
-
-```text
-✓ WORKFLOW COMPLETE
-```
-
-and enable:
-
-```text
-VIEW FINAL ANALYSIS →
-```
-
-Only at this exact point should Analysis become accessible.
-
----
-
-# 7. Do NOT navigate to Analysis before state is ready
-
-The current `handleViewAnalysis()` must not simply receive any `executionId` and scroll.
-
-The function should first verify that the workflow has actually completed.
-
-Conceptually:
-
-```js
-if (!workflowComplete) {
-    return;
-}
-
-if (!analysisExecutionId) {
-    return;
-}
-```
-
-Then scroll to Analysis.
-
-Do not use a stale `activeExecId`.
-
-Do not use the execution ID from workflow initialization if Step 9 has not completed.
-
----
-
-# 8. Prefer the Step 9 returned execution ID
-
-After Step 9:
-
-```js
-const result = await executeWorkflowStep(workflowId, 9);
-```
-
-Use:
-
-```js
-result.executionId
-```
-
-as the confirmed execution ID.
-
-Then:
-
-```js
-setAnalysisExecutionId(result.executionId);
-```
-
-This makes the final Analysis explicitly tied to the completed workflow execution.
-
----
-
-# 9. Do not accidentally overwrite Process execution
-
-Process has its own execution.
-
-When:
-
-```text
-RUN ALGORITHM
-```
-
-returns:
-
-```json
-{
-    "success": true,
-    "executionId": "...",
-    "status": "completed"
-}
-```
-
-set:
-
-```text
-analysisExecutionId = res.executionId
-```
-
-and store:
-
-```text
-processRunData = res
-```
-
-Then Analysis is allowed to fetch the report.
-
-Do not let a later Workflow state update overwrite the Process execution ID.
-
----
-
-# 10. Separate Workflow and Process state
-
-Use explicit state semantics.
-
-Recommended:
-
-```js
-const [workflowId, setWorkflowId] = useState(null);
-const [workflowExecutionId, setWorkflowExecutionId] = useState(null);
-
-const [analysisExecutionId, setAnalysisExecutionId] = useState(null);
-
-const [workflowComplete, setWorkflowComplete] = useState(false);
-
-const [processRunData, setProcessRunData] = useState(null);
-```
-
-Meaning:
-
-```text
-workflowId
-→ controls Pipeline
-
-workflowExecutionId
-→ execution associated with Pipeline
-
-workflowComplete
-→ whether Step 9 has actually completed
-
-analysisExecutionId
-→ execution that Analysis is allowed to inspect
-
-processRunData
-→ direct Process API result
-```
-
-Do not collapse these meanings into one state variable.
-
----
-
-# 11. Analysis initial state
-
-When there is no `analysisExecutionId`, Analysis must NOT show:
-
-```text
-EXECUTION FAILED
-```
-
-It should simply remain inactive/idle or display an appropriate state such as:
-
-```text
-AWAITING COMPLETED EXECUTION
-```
-
-or:
-
-```text
-NO ANALYSIS SESSION
-```
-
-Do not present an error when no execution is ready.
-
----
-
-# 12. Distinguish three Analysis states
-
-Analysis must have three clearly different states.
-
-## State A — No execution ready
-
-```text
-WAITING FOR COMPLETED EXECUTION
-```
-
-This is NOT an error.
-
----
-
-## State B — Report loading
-
-```text
-ANALYZING SECURE TRANSMISSION...
-RECONSTRUCTING EXECUTION RECORD...
-LOADING PERFORMANCE DATA...
-PREPARING REPORT BLOCKS...
-```
-
-This is NOT an error.
-
----
-
-## State C — Actual execution failure
-
-Only show:
-
-```text
-EXECUTION FAILED
-```
-
-when the backend report explicitly says:
-
-```text
-summary.status === "failed"
-```
-
-or the backend provides an explicit failed execution result.
-
-Do not use:
-
-```text
-catch()
-```
-
-as proof that the cryptographic execution failed.
-
----
-
-# 13. Distinguish fetch failure from execution failure
-
-A failed:
-
-```text
-GET /api/report/:executionId
-```
-
-may mean:
-
-* network error
-* backend unavailable
-* execution not committed yet
-* malformed response
-* execution ID not found
-* actual execution failure
-
-Do not convert every one of those into:
-
-```text
-EXECUTION FAILED
-```
-
-Use separate UI states.
-
-For example:
-
-```text
-REPORT FETCH FAILED
-```
-
-for transport/API problems.
-
-Use:
-
-```text
-EXECUTION FAILED
-```
-
-only when the backend explicitly reports an execution failure.
-
----
-
-# 14. Prevent race conditions with report fetching
-
-The Analysis fetch should happen only after the correct execution is ready.
-
-When `analysisExecutionId` changes:
-
-```text
-old report state
+TTS
 ↓
-clear stale report
+center SecureNet logo
 ↓
-set loading = true
+logo smoothly moves to navbar position
 ↓
-fetch current execution report
+intro overlay disappears
 ↓
-validate response belongs to current executionId
+ACTUAL LandingPage becomes visible/mounts
 ↓
-set report
+existing `GridDistortion` naturally initializes/resolves
 ↓
-loading = false
+grid distortion resolves into the actual `landingImage`
+↓
+Home is fully visible
+
+Do NOT create another grid animation, radar animation, scanline animation, telemetry animation, or reconstruction overlay.
+
+CHANGES REQUIRED:
+
+1. REMOVE `HomeBootReveal` from the flow completely.
+
+   * Stop importing `HomeBootReveal` in `SecureNetIntro.jsx`.
+   * Remove the `HOME_BOOT` phase.
+   * Remove the `<HomeBootReveal />` render block.
+   * `HomeBootReveal.jsx` and its CSS should no longer be used.
+   * Do not replace it with another fake overlay.
+
+2. KEEP `IntroLogoTransition.jsx`.
+
+   * The existing center-logo → navbar-logo FLIP transition should remain.
+   * Once that animation completes, the intro should finish immediately.
+
+3. AFTER `handleTransitionComplete`:
+
+   * transition directly to the normal completed/entered state.
+   * call `onIntroComplete()`.
+   * preserve `sessionStorage` behavior so the intro does not appear again during the session.
+   * do not insert another visual layer between the logo transition and Home.
+
+4. MAKE THE REAL `LandingPage` reveal/mount at the correct time.
+
+   * The existing `LandingPage.jsx` must remain the actual Home page.
+   * Do not duplicate LandingPage markup inside the intro.
+   * Do not recreate GridDistortion inside `SecureNetIntro`.
+   * The parent/app-level rendering logic should decide when LandingPage is revealed.
+
+5. IMPORTANT:
+   The existing `GridDistortion` component should get a fresh mount/reinitialization when Home is revealed after the intro, so its natural distortion/image-resolution effect plays as the Home appears.
+
+   Preferred approach:
+
+   * conditionally mount/reveal the actual `LandingPage` only after intro completion, OR
+   * use a controlled remount/key if the current app architecture already keeps LandingPage mounted.
+
+   Choose the cleanest approach based on the existing app structure.
+   Do NOT hack the visual effect with CSS pretending to be GridDistortion.
+
+6. PRESERVE THE EXISTING LANDING PAGE.
+   Do not redesign it.
+   Keep:
+
+   * existing `LandingPage.jsx`
+   * existing `GridDistortion`
+   * existing hero image
+   * existing typography
+   * existing navbar
+   * existing hero content
+   * existing buttons
+   * existing overlays/vignette
+
+7. PRESERVE INTRO BEHAVIOR.
+   Keep:
+
+   * readiness states
+   * Initialize/Start Progress button
+   * hammer audio once
+   * forging/progress sequence
+   * secure channel ready
+   * Enter SecureNet button
+   * TTS sequence
+   * centered logo reveal
+   * logo transition to navbar
+   * Skip Intro behavior
+   * sessionStorage behavior
+
+8. SKIP INTRO:
+   Skip should still go directly to the actual Home page.
+   It must NOT show any HomeBootReveal/fake reconstruction layer.
+
+9. DO NOT CHANGE UNRELATED CODE.
+   Only modify the files/components necessary to fix this transition and the Home mount lifecycle.
+
+EXPECTED RESULT:
+When the logo reaches the navbar, I should see the REAL landing page come in through its EXISTING `GridDistortion`.
+
+Visually it should feel like:
+
 ```
-
-Prevent an older asynchronous request from overwriting a newer execution's report.
-
-Use a mounted/abort/stale-request guard as appropriate.
-
----
-
-# 15. Report status must not default to failure
-
-Do not make any of these assumptions:
-
-```text
-null report = failed
-loading = failed
-missing report = failed
-fetch error = failed
-```
-
-Instead:
-
-```text
-null + loading
-→ LOADING
-
-null + no execution
-→ WAITING
-
-null + fetch error
-→ REPORT FETCH ERROR
-
-report.summary.status === "failed"
-→ EXECUTION FAILED
-
-report.summary.status === "completed"
-→ COMPLETED
-```
-
----
-
-# 16. Fix Analysis verification derivation
-
-Analysis should derive verification only from actual report data.
-
-Never use:
-
-```js
-true
-```
-
-as a default success value.
-
-The final verification state must come from:
-
-```text
-report.verification.sharedSecretsMatch
-report.verification.signatureValid
-report.verification.decryptionSuccess
-report.verification.plaintextMatch
-```
-
-The final result should be successful only if the real backend values indicate success.
-
-Do not let frontend defaults overwrite backend verification.
-
----
-
-# 17. `isVerified` logic
-
-Keep `isVerified` as:
-
-```text
-null
-```
-
-until a real report has been loaded.
-
-Use:
-
-```text
-null
-→ unknown/loading
-
-true
-→ backend confirms verified
-
-false
-→ backend confirms failure
-```
-
-Never default:
-
-```text
-report === null
-```
-
-to:
-
-```text
-true
-```
-
-or:
-
-```text
-false
-```
-
----
-
-# 18. FinalResult component
-
-`FinalResult.jsx` must consume the real verification object supplied by AnalysisPage.
-
-Do not hardcode:
-
-```js
-pass: true
-```
-
-for:
-
-* signature
-* plaintext match
-* shared secret
-* decryption
-* final result
-
-Instead map directly from:
-
-```js
-verification.signatureValid
-verification.sharedSecretsMatch
-verification.decryptionSuccess
-verification.plaintextMatch
-```
-
-and derive the final status from those actual values.
-
----
-
-# 19. Keep the existing Analysis design
-
-Do not redesign the Analysis UI.
-
-Keep:
-
-```text
-FINAL TRANSMISSION ANALYSIS
-EXECUTION SUMMARY
-MISSION INPUT
-ENCRYPTION ANALYSIS
-DECRYPTION ANALYSIS
-CRYPTOGRAPHIC MATERIAL
-SECURE PACKET
-VERIFICATION
-PERFORMANCE ANALYSIS
-FINAL RESULT
-REPORT EXPORT
-```
-
-Only fix the state lifecycle and data flow.
-
----
-
-# 20. `MissionPage` behavior
-
-The Mission Page must distinguish the two buttons.
-
-## Run Secure Demonstration
-
-```text
-upload
- ↓
-startWorkflow()
- ↓
-set workflowId
- ↓
-set workflowExecutionId
- ↓
-workflowComplete = false
- ↓
-Pipeline active
- ↓
-NO Analysis fetch
-```
-
-## Run Algorithm
-
-```text
-upload
- ↓
-runProcess()
- ↓
-receive completed execution
- ↓
-set processRunData
- ↓
-set analysisExecutionId
- ↓
-Analysis fetch allowed
-```
-
----
-
-# 21. Workflow completion behavior
-
-When Step 1–8 complete:
-
-```text
-workflowComplete = false
-analysisExecutionId = null
-```
-
-When Step 9 API response is:
-
-```json
-{
-    "step": 9,
-    "status": "completed",
-    "executionId": "..."
-}
-```
-
-then:
-
-```text
-workflowComplete = true
-analysisExecutionId = response.executionId
-```
-
-Only now:
-
-```text
-VIEW FINAL ANALYSIS
-```
-
-becomes enabled.
-
----
-
-# 22. New Transmission behavior
-
-When New Transmission is clicked:
-
-reset all transient execution state:
-
-```text
-workflowId = null
-workflowExecutionId = null
-analysisExecutionId = null
-workflowComplete = false
-processRunData = null
-```
-
-Also clear the old Analysis report state when appropriate.
-
-Do not allow the previous execution ID to remain active.
-
----
-
-# 23. Very important: no automatic report fetch during Workflow startup
-
-This is the key acceptance requirement.
-
-Starting Workflow must NOT result in:
-
-```text
-POST /workflow/start
+[grid/distorted field]
         ↓
-GET /report/:executionId
+image naturally resolves
+        ↓
+REAL SecureNet landing page
 ```
 
-The report request must not happen until Step 9 is confirmed complete.
+NOT:
 
----
-
-# 24. Expected Workflow sequence
-
-Test using:
-
-```text
-Thanks a lot GPT
+```
+[fake military radar overlay]
+        ↓
+[scanline/reconstruction animation]
+        ↓
+[landing page appears]
 ```
 
-Expected:
+The existing React Bits `GridDistortion` is the source of truth for the Home reveal effect.
 
-```text
-RUN SECURE DEMONSTRATION
-        ↓
-POST /api/workflow/start
-        ↓
-workflowId
-workflowExecutionId
-        ↓
-PIPELINE
-        ↓
-Step 1
-        ↓
-Step 2
-        ↓
-...
-        ↓
-Step 9
-        ↓
-await Step 9 response
-        ↓
-response.status === completed
-        ↓
-workflowComplete = true
-        ↓
-analysisExecutionId = response.executionId
-        ↓
-VIEW FINAL ANALYSIS enabled
-        ↓
-GET /api/report/:executionId
+Before editing:
+
+* inspect the app/root routing/rendering structure
+* identify where `SecureNetIntro` and `LandingPage` are mounted
+* determine whether LandingPage is currently mounted underneath the intro or only mounted after intro completion
+
+Then implement the smallest clean architectural fix.
+
+After editing, verify:
+
+* no `HomeBootReveal` is rendered anywhere
+* no duplicate GridDistortion exists
+* no duplicate LandingPage exists
+* logo transition still reaches navbar correctly
+* intro disappears cleanly
+* actual LandingPage mounts/reveals
+* GridDistortion starts naturally when Home is revealed
+* Skip Intro still works
+* returning/reloading in the same session bypasses intro
+
 ```
 
-There must be **no report request before Step 9 completes**.
-
----
-
-# 25. Expected Process sequence
-
-Test:
-
-```text
-RUN ALGORITHM
-```
-
-Expected:
-
-```text
-POST /api/process/run
-        ↓
-success = true
-status = completed
-executionId
-        ↓
-analysisExecutionId = executionId
-        ↓
-GET /api/report/:executionId
-        ↓
-Analysis displayed
-```
-
-Process does not need the Pipeline's nine-step UI.
-
----
-
-# 26. Debugging instrumentation
-
-Temporarily add useful console logs around the lifecycle, for example:
-
-```text
-[Workflow] started
-[Workflow] workflowId = ...
-[Workflow] executionId = ...
-[Workflow] step = 1 completed
-...
-[Workflow] step = 9 API response received
-[Workflow] execution status confirmed completed
-[Analysis] report fetch allowed
-[Analysis] fetching execution = ...
-[Analysis] report loaded
-```
-
-Do not leave noisy debug logging everywhere after verification.
-
----
-
-# 27. Validate execution identity
-
-Before rendering the final report, ensure the report corresponds to the currently active execution.
-
-For Workflow:
-
-```text
-report.summary.executionId === analysisExecutionId
-```
-
-For Process:
-
-```text
-report.summary.executionId === processRunData.executionId
-```
-
-If there is a mismatch, do not silently display the report.
-
----
-
-# 28. Important existing backend behavior
-
-Do not modify backend cryptographic logic as part of this frontend fix unless an API contract absolutely requires it.
-
-The backend Workflow service already marks the Execution Context as completed after Step 9 and stores the final verification data. Preserve that behavior.
-
-The frontend's responsibility is to **wait for and consume that completed state correctly**.
-
----
-
-# 29. Acceptance criteria
-
-The fix is complete only when all of these are true:
-
-### Before any workflow step
-
-```text
-Pipeline:
-01 / 09
-Ready / Step 1
-
-Analysis:
-NOT EXECUTION FAILED
-NO REPORT FETCH
-```
-
-### During Step 1–8
-
-```text
-Pipeline:
-current step displayed
-
-Analysis:
-NO final report request
-```
-
-### After Step 9
-
-```text
-Pipeline:
-100%
-WORKFLOW COMPLETE
-NEXT STEP disabled
-VIEW FINAL ANALYSIS enabled
-```
-
-### After clicking View Final Analysis
-
-```text
-GET /api/report/:executionId
-```
-
-is called using the completed execution ID.
-
-### Process mode
-
-```text
-RUN ALGORITHM
-→ complete process
-→ executionId
-→ Analysis
-→ report
-```
-
-### Actual failure
-
-Only then:
-
-```text
-EXECUTION FAILED
-```
-
-### Network/report error
-
-Show:
-
-```text
-ANALYSIS UNAVAILABLE
-REPORT FETCH FAILED
-```
-
-not:
-
-```text
-EXECUTION FAILED
-```
-
-unless the backend explicitly says the execution failed.
-
----
-
-# 30. Preserve existing code
-
-**Keep the existing code, structure, components, styling, and functionality exactly as they are; create new files/components for the requested work wherever possible. Only modify existing files when strictly required for integration/state lifecycle fixes, and make the smallest possible changes without refactoring or altering unrelated existing behavior.**
-
-The core objective is simple:
-
-```text
-WORKFLOW START
-    ≠
-ANALYSIS READY
-
-WORKFLOW STEP 9 COMPLETED
-    =
-ANALYSIS READY
-
-PROCESS COMPLETED
-    =
-ANALYSIS READY
-```
-
-And the most important invariant is:
-
-```text
-NEVER call GET /api/report/:executionId
-for a Workflow execution until Step 9's API response
-has explicitly confirmed status: "completed".
+**One thing to emphasize to the agent:** don't let it “fix” this by making `HomeBootReveal` look more like `GridDistortion`. **The entire `HomeBootReveal` concept should disappear.** The actual `LandingPage → GridDistortion` instance is the animation.
 ```
