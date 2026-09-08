@@ -1,0 +1,548 @@
+/* src/components/intro/SecureNetIntro.css */
+
+/* Fullscreen tactical overlay */
+.securenet-intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background-color: var(--bg-primary, #11120f);
+  color: var(--text-primary, #ECEEE1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100svh;
+  width: 100vw;
+  overflow: hidden;
+  font-family: var(--font-body, 'Geist', sans-serif);
+  user-select: none;
+}
+
+.intro-viewport {
+  width: 100%;
+  max-width: 900px;
+  padding: var(--space-6, 24px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: transform 100ms ease-out;
+}
+
+/* Micro-impact screen vibration on hammer hit */
+.intro-viewport.vibrate-hit {
+  animation: microImpactVibrate 150ms ease-in-out;
+}
+
+@keyframes microImpactVibrate {
+  0% {
+    transform: translate(0, 0);
+  }
+
+  25% {
+    transform: translate(-2px, 1px);
+  }
+
+  50% {
+    transform: translate(2px, -1px);
+  }
+
+  75% {
+    transform: translate(-1px, 2px);
+  }
+
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+/* -------------------------------------------------- */
+/* 1. INTRO CONSOLE (LOADING & PROGRESS)             */
+/* -------------------------------------------------- */
+.intro-console {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+}
+
+.intro-header-controls {
+  position: absolute;
+  top: -40px;
+  right: 0;
+}
+
+.intro-voice-toggle {
+  background: transparent;
+  border: 1px solid var(--border-default, #32381F);
+  color: var(--text-muted, #929A68);
+  font-family: var(--font-mono, 'Geist Mono', monospace);
+  font-size: var(--text-mono-xs, 0.625rem);
+  letter-spacing: 0.1em;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm, 2px);
+  cursor: pointer;
+  transition: all var(--transition-fast, 100ms ease);
+}
+
+.intro-voice-toggle:hover,
+.intro-voice-toggle:focus-visible {
+  border-color: var(--accent-primary, #6A7337);
+  color: var(--text-primary, #ECEEE1);
+  outline: none;
+}
+
+.intro-voice-toggle.muted {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+/* Branding Title */
+.intro-branding {
+  margin-bottom: var(--space-8, 32px);
+}
+
+.intro-title {
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  margin: 0 0 var(--space-1, 4px) 0;
+  color: var(--text-primary, #ECEEE1);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.intro-subtitle {
+  font-family: var(--font-mono, 'Geist Mono', monospace);
+  font-size: var(--text-mono-lg, 0.875rem);
+  color: var(--accent-bright, #9EAB52);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+/* Gesture Prompt Block */
+.intro-gesture-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: var(--space-6, 24px);
+  animation: fadeInPrompt 500ms ease-out forwards;
+  cursor: pointer;
+}
+
+@keyframes fadeInPrompt {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.prompt-status-tag {
+  font-family: var(--font-mono, 'Geist Mono', monospace);
+  font-size: var(--text-mono-xs, 0.625rem);
+  color: var(--text-muted, #929A68);
+  letter-spacing: 0.2em;
+  margin-bottom: var(--space-4, 16px);
+}
+
+.intro-prompt-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3, 12px);
+}
+
+.initialize-boot-btn {
+  background-color: var(--color-dark-panel, #1A1D13);
+  color: var(--text-primary, #ECEEE1);
+  border: 1px solid var(--accent-bright, #9EAB52);
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  font-size: var(--text-body-base, 1rem);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  padding: 16px 40px;
+  border-radius: var(--radius-md, 4px);
+  cursor: pointer;
+  transition: all var(--transition-fast, 100ms ease);
+  box-shadow: 0 0 16px rgba(158, 171, 82, 0.25);
+  animation: pulseGlow 2s infinite alternate;
+}
+
+@keyframes pulseGlow {
+  0% {
+    box-shadow: 0 0 12px rgba(158, 171, 82, 0.2);
+  }
+
+  100% {
+    box-shadow: 0 0 24px rgba(158, 171, 82, 0.6);
+  }
+}
+
+.initialize-boot-btn:hover,
+.initialize-boot-btn:focus-visible {
+  background-color: var(--color-reseda-green, #6A7337);
+  color: var(--color-almost-black, #11120f);
+  border-color: #C5D470;
+  box-shadow: 0 0 28px rgba(197, 212, 112, 0.8);
+  outline: none;
+}
+
+.skip-intro-btn {
+  background: transparent;
+  border: 1px solid var(--border-default, #32381F);
+  color: var(--text-muted, #929A68);
+  font-family: var(--font-mono, 'Geist Mono', monospace);
+  font-size: var(--text-mono-xs, 0.75rem);
+  letter-spacing: 0.15em;
+  padding: 8px 24px;
+  border-radius: var(--radius-sm, 2px);
+  cursor: pointer;
+  transition: all var(--transition-fast, 100ms ease);
+  margin-top: 4px;
+}
+
+.skip-intro-btn:hover,
+.skip-intro-btn:focus-visible {
+  border-color: var(--text-secondary, #AEB3B8);
+  color: var(--text-primary, #ECEEE1);
+  outline: none;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.prompt-subtext {
+  font-family: var(--font-mono, 'Geist Mono', monospace);
+  font-size: var(--text-mono-xs, 0.625rem);
+  color: var(--text-muted, #929A68);
+  letter-spacing: 0.15em;
+  margin-top: var(--space-3, 12px);
+}
+
+/* Status Readiness Block */
+.intro-status-block {
+  width: 100%;
+  max-width: 480px;
+  background-color: var(--bg-secondary, #1A1D13);
+  border: 1px solid var(--border-default, #32381F);
+  border-radius: var(--radius-md, 4px);
+  padding: var(--space-4, 16px) var(--space-6, 24px);
+  margin-bottom: var(--space-8, 32px);
+  box-shadow: var(--shadow-md);
+}
+
+.intro-section-label {
+  font-family: var(--font-mono, 'Geist Mono', monospace);
+  font-size: var(--text-mono-xs, 0.625rem);
+  color: var(--text-muted, #929A68);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: var(--space-3, 12px);
+  border-bottom: 1px solid var(--border-subtle, rgba(106, 115, 55, 0.2));
+  padding-bottom: var(--space-2, 8px);
+  text-align: left;
+}
+
+.intro-readiness-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.intro-readiness-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono, 'Geist Mono', monospace);
+  font-size: var(--text-mono-base, 0.75rem);
+}
+
+.readiness-label {
+  color: var(--text-secondary, #AEB3B8);
+  letter-spacing: 0.1em;
+}
+
+.readiness-status {
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  padding: 2px 6px;
+  border-radius: 2px;
+  transition: all 200ms ease;
+}
+
+.readiness-status.pending {
+  color: var(--color-dark-moss, #4B5320);
+  background-color: rgba(75, 83, 32, 0.15);
+}
+
+.readiness-status.ready {
+  color: var(--status-success, #709A68);
+  background-color: rgba(112, 154, 104, 0.15);
+  border: 1px solid rgba(112, 154, 104, 0.3);
+}
+
+/* Segmented 4-Stage Progress Bar */
+.intro-progress-container {
+  width: 100%;
+  max-width: 540px;
+  margin-bottom: var(--space-8, 32px);
+}
+
+.intro-progress-bar {
+  display: flex;
+  gap: 8px;
+  height: 12px;
+  width: 100%;
+  background-color: rgba(26, 29, 19, 0.8);
+  border: 1px solid var(--border-default, #32381F);
+  padding: 3px;
+  border-radius: var(--radius-sm, 2px);
+  box-sizing: border-box;
+}
+
+.progress-segment {
+  flex: 1;
+  height: 100%;
+  background-color: rgba(43, 49, 10, 0.5);
+  border-radius: 1px;
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-segment.filled {
+  background-color: var(--accent-primary, #6A7337);
+  box-shadow: 0 0 8px rgba(106, 115, 55, 0.4);
+}
+
+.progress-segment.impact-hit {
+  background-color: var(--accent-bright, #9EAB52);
+  box-shadow: 0 0 16px rgba(158, 171, 82, 0.8);
+}
+
+.intro-progress-telemetry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-2, 8px);
+  font-family: var(--font-mono, 'Geist Mono', monospace);
+  font-size: var(--text-mono-sm, 0.6875rem);
+  color: var(--text-muted, #929A68);
+  letter-spacing: 0.1em;
+}
+
+.telemetry-percentage {
+  font-weight: 700;
+  color: var(--accent-bright, #9EAB52);
+}
+
+/* Action & Enter Button */
+.intro-footer-action {
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.system-nominal-tag {
+  font-family: var(--font-mono, 'Geist Mono', monospace);
+  font-size: var(--text-mono-base, 0.75rem);
+  color: var(--text-secondary, #AEB3B8);
+  letter-spacing: 0.2em;
+  margin-bottom: var(--space-3, 12px);
+}
+
+.status-highlight {
+  color: var(--status-success, #709A68);
+  font-weight: 700;
+}
+
+.enter-button-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: fadeInButton 400ms ease-out forwards;
+}
+
+@keyframes fadeInButton {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.enter-securenet-btn {
+  background-color: var(--color-dark-panel, #1A1D13);
+  color: var(--text-primary, #ECEEE1);
+  border: 1px solid var(--accent-primary, #6A7337);
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  font-size: var(--text-body-base, 1rem);
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  padding: 14px 36px;
+  border-radius: var(--radius-md, 4px);
+  cursor: pointer;
+  transition: all var(--transition-fast, 100ms ease);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.enter-securenet-btn:hover,
+.enter-securenet-btn:focus-visible {
+  background-color: var(--color-reseda-green, #6A7337);
+  color: var(--color-almost-black, #11120f);
+  border-color: var(--accent-bright, #9EAB52);
+  box-shadow: 0 0 16px rgba(106, 115, 55, 0.5);
+  outline: none;
+}
+
+.enter-subtext {
+  font-family: var(--font-mono, 'Geist Mono', monospace);
+  font-size: var(--text-mono-xs, 0.625rem);
+  color: var(--text-muted, #929A68);
+  letter-spacing: 0.15em;
+  margin-top: var(--space-2, 8px);
+}
+
+/* -------------------------------------------------- */
+/* 2. SPEECH BRIEFING LAYOUT                         */
+/* -------------------------------------------------- */
+.intro-speech-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.center-logo-wrapper {
+  margin-bottom: var(--space-8, 32px);
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 600ms ease-out, transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.center-logo-wrapper.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.intro-center-logo {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+}
+
+.briefing-box {
+  width: 100%;
+  max-width: 600px;
+  background-color: var(--bg-secondary, #1A1D13);
+  border: 1px solid var(--border-default, #32381F);
+  border-radius: var(--radius-md, 4px);
+  padding: var(--space-6, 24px);
+  text-align: left;
+  box-shadow: var(--shadow-lg);
+}
+
+.briefing-header {
+  font-family: var(--font-mono, 'Geist Mono', monospace);
+  font-size: var(--text-mono-xs, 0.625rem);
+  color: var(--accent-bright, #9EAB52);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: var(--space-4, 16px);
+  border-bottom: 1px solid var(--border-subtle, rgba(106, 115, 55, 0.2));
+  padding-bottom: var(--space-2, 8px);
+}
+
+.briefing-sentences {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+}
+
+.briefing-sentence {
+  font-family: var(--font-body, 'Geist', sans-serif);
+  font-size: var(--text-body-lg, 1.125rem);
+  line-height: var(--line-height-relaxed, 1.7);
+  display: flex;
+  gap: var(--space-3, 12px);
+  transition: opacity 300ms ease, color 300ms ease;
+}
+
+.briefing-sentence.active {
+  opacity: 1;
+  color: var(--text-primary, #ECEEE1);
+  font-weight: 500;
+}
+
+.briefing-sentence.past {
+  opacity: 0.45;
+  color: var(--text-secondary, #AEB3B8);
+}
+
+.briefing-sentence.future {
+  opacity: 0.2;
+  color: var(--text-muted, #929A68);
+}
+
+.sentence-prompt {
+  font-family: var(--font-mono, 'Geist Mono', monospace);
+  color: var(--accent-bright, #9EAB52);
+  font-weight: 700;
+  width: 12px;
+}
+
+/* -------------------------------------------------- */
+/* 3. ACCESSIBILITY & RESPONSIVE QUERY               */
+/* -------------------------------------------------- */
+@media (max-width: 600px) {
+  .intro-title {
+    font-size: 2.2rem;
+  }
+
+  .intro-subtitle {
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+  }
+
+  .intro-center-logo {
+    width: 90px;
+    height: 90px;
+  }
+
+  .briefing-sentence {
+    font-size: 0.95rem;
+  }
+
+  .enter-securenet-btn {
+    padding: 12px 24px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-viewport.vibrate-hit {
+    animation: none;
+  }
+
+  .center-logo-wrapper {
+    transition: opacity 200ms ease;
+  }
+
+  .enter-button-wrapper {
+    animation: none;
+  }
+}
