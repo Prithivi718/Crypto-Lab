@@ -19,6 +19,9 @@
 }
 
 .intro-viewport {
+  position: relative;
+  /* stacks above z-index:0 DotGrid canvas */
+  z-index: 1;
   width: 100%;
   max-width: 900px;
   padding: var(--space-6, 24px);

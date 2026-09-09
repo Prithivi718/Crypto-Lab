@@ -80,6 +80,8 @@ export default function LandingPage() {
                             <span className="type-mono-xs text-muted">ECDH</span>
                             <span className="hero-tech-separator" aria-hidden="true">/</span>
                             <span className="type-mono-xs text-muted">HKDF</span>
+                            <span className="hero-tech-separator" aria-hidden="true">/</span>
+                            <span className="type-mono-xs text-muted">RSA-OAEP</span>
                         </div>
 
                     </div>

@@ -353,183 +353,1275 @@ export const generateReportPDF = (executionId) => {
     return new Promise((resolve, reject) => {
         try {
             const doc = new PDFDocument({
-                margin: 40,
-                size: 'A4'
+                size: 'A4',
+                margins: {
+                    top: 55,
+                    bottom: 55,
+                    left: 48,
+                    right: 48,
+                },
+                info: {
+                    Title: 'SecureNet Cryptographic Execution Report',
+                    Author: 'SecureNet Defence Communication Network',
+                    Subject: 'Cryptographic Execution and Verification Report',
+                },
+                bufferPages: true,
             });
 
             const buffers = [];
+
             doc.on('data', (chunk) => buffers.push(chunk));
             doc.on('end', () => resolve(Buffer.concat(buffers)));
             doc.on('error', reject);
 
-            // Document Styling Colors
-            const darkBg = '#0d1117';
-            const primaryColor = '#2ea043';
-            const accentColor = '#388bfd';
-            const textColor = '#c9d1d9';
-            const mutedText = '#8b949e';
+            /* ============================================================
+             * SECURENET COLOR PALETTE
+             * ============================================================
+             */
 
-            // Header Banner
-            doc.rect(0, 0, doc.page.width, 65).fill('#161b22');
-            doc.fillColor(primaryColor).fontSize(16).font('Helvetica-Bold').text('SECURENET DEFENCE COMMUNICATION NETWORK', 40, 18);
-            doc.fillColor(textColor).fontSize(10).font('Helvetica').text('CRITICAL CRYPTOGRAPHIC EXECUTION & BENCHMARK REPORT', 40, 38);
+            const C = {
+                // Main brand / tactical colors
+                oliveDark: '#2B310A',
+                olive: '#4B5320',
+                oliveMid: '#6A7337',
+                oliveSoft: '#929A68',
 
-            doc.y = 80;
+                // Page
+                paper: '#F5F4EE',
+                paperAlt: '#ECEBE2',
 
-            // Summary Box
-            doc.fillColor(accentColor).fontSize(12).font('Helvetica-Bold').text('1. EXECUTIVE SUMMARY', 40, doc.y);
-            doc.moveDown(0.3);
+                // Text
+                text: '#25291B',
+                textSoft: '#4E5341',
+                muted: '#727766',
 
-            const summaryY = doc.y;
-            doc.rect(40, summaryY, doc.page.width - 80, 75).fillAndStroke('#161b22', '#30363d');
-            doc.fillColor(textColor).fontSize(9).font('Helvetica');
-            doc.text(`Execution ID : ${data.summary.executionId}`, 50, summaryY + 10);
-            doc.text(`Filename     : ${data.summary.filename} (${data.summary.inputSize} bytes)`, 50, summaryY + 25);
-            doc.text(`Created At   : ${data.summary.createdAt}`, 50, summaryY + 40);
-            doc.text(`Completed At : ${data.summary.completedAt || 'N/A'}`, 50, summaryY + 55);
+                // Borders
+                border: '#C5C8B5',
+                borderDark: '#92977D',
 
-            doc.text(`Status       : ${data.summary.status.toUpperCase()}`, 320, summaryY + 10);
-            doc.text(`Verification : ${data.verification.finalStatus}`, 320, summaryY + 25);
-            doc.text(`Total Time   : ${data.benchmark.timing?.totalElapsedMs} ms`, 320, summaryY + 40);
-            doc.text(`Throughput   : ${data.benchmark.analysis?.throughputKBps} KB/s`, 320, summaryY + 55);
+                // Status
+                success: '#4F6F32',
+                successBg: '#EAF0E1',
+                danger: '#9B433A',
+                dangerBg: '#F5E7E5',
 
-            doc.y = summaryY + 90;
+                // Code / cryptographic values
+                codeBg: '#EEF0E8',
+                codeText: '#34401D',
 
-            // Input Plaintext
-            doc.fillColor(accentColor).fontSize(12).font('Helvetica-Bold').text('2. MISSION INPUT PLAINTEXT', 40, doc.y);
-            doc.moveDown(0.3);
-            const inputY = doc.y;
-            doc.rect(40, inputY, doc.page.width - 80, 45).fillAndStroke('#0d1117', '#30363d');
-            doc.fillColor('#7ee787').fontSize(9).font('Courier').text(data.input.plaintext, 50, inputY + 10, {
-                width: doc.page.width - 100
-            });
+                white: '#FFFFFF',
+            };
 
-            doc.y = inputY + 55;
+            const PAGE = {
+                width: doc.page.width,
+                height: doc.page.height,
+                left: doc.page.margins.left,
+                right: doc.page.width - doc.page.margins.right,
+                top: doc.page.margins.top,
+                bottom: doc.page.height - doc.page.margins.bottom,
+                contentWidth:
+                    doc.page.width -
+                    doc.page.margins.left -
+                    doc.page.margins.right,
+            };
 
-            // 9-Step Pipeline Section
-            doc.fillColor(accentColor).fontSize(12).font('Helvetica-Bold').text('3. STEP-BY-STEP CRYPTOGRAPHIC PIPELINE (9 STEPS)', 40, doc.y);
-            doc.moveDown(0.4);
+            /* ============================================================
+             * FONT HELPERS
+             * ============================================================
+             */
 
-            data.steps.forEach((st) => {
-                if (doc.y > doc.page.height - 120) {
-                    doc.addPage();
+            const setBody = () => {
+                doc.font('Helvetica').fontSize(9).fillColor(C.text);
+            };
+
+            const setMono = () => {
+                doc.font('Courier').fontSize(7.5).fillColor(C.codeText);
+            };
+
+            /* ============================================================
+             * PAGE HEADER / FOOTER
+             * ============================================================
+             */
+
+            const drawPageChrome = (pageNumber) => {
+                // Header rule
+                doc
+                    .moveTo(PAGE.left, 32)
+                    .lineTo(PAGE.right, 32)
+                    .lineWidth(1)
+                    .strokeColor(C.olive)
+                    .stroke();
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(7)
+                    .fillColor(C.olive)
+                    .text(
+                        'SECURENET DEFENCE COMMUNICATION NETWORK',
+                        PAGE.left,
+                        18,
+                        {
+                            width: PAGE.contentWidth,
+                            align: 'left',
+                        }
+                    );
+
+                doc
+                    .font('Helvetica')
+                    .fontSize(7)
+                    .fillColor(C.muted)
+                    .text(
+                        `EXECUTION REPORT  /  ${executionId}`,
+                        PAGE.left,
+                        18,
+                        {
+                            width: PAGE.contentWidth,
+                            align: 'right',
+                        }
+                    );
+
+                // Footer
+                doc
+                    .moveTo(PAGE.left, PAGE.height - 32)
+                    .lineTo(PAGE.right, PAGE.height - 32)
+                    .lineWidth(0.75)
+                    .strokeColor(C.border)
+                    .stroke();
+
+                doc
+                    .font('Helvetica')
+                    .fontSize(7)
+                    .fillColor(C.muted)
+                    .text(
+                        'SECURENET  |  CRYPTOGRAPHIC EXECUTION & VERIFICATION',
+                        PAGE.left,
+                        PAGE.height - 23,
+                        {
+                            width: PAGE.contentWidth / 2,
+                            align: 'left',
+                        }
+                    );
+
+                doc
+                    .text(
+                        `PAGE ${pageNumber}`,
+                        PAGE.right - 80,
+                        PAGE.height - 23,
+                        {
+                            width: 80,
+                            align: 'right',
+                        }
+                    );
+            };
+
+            let currentPage = 1;
+
+            drawPageChrome(currentPage);
+
+            /* ============================================================
+             * PAGE MANAGEMENT
+             * ============================================================
+             */
+
+            const newPage = () => {
+                doc.addPage();
+                currentPage += 1;
+                drawPageChrome(currentPage);
+                doc.y = PAGE.top;
+            };
+
+            const ensureSpace = (heightNeeded) => {
+                const remaining = PAGE.bottom - doc.y;
+
+                if (remaining < heightNeeded) {
+                    newPage();
+                    return true;
                 }
 
-                const stepY = doc.y;
-                doc.rect(40, stepY, doc.page.width - 80, 18).fill('#161b22');
-                doc.fillColor(primaryColor).fontSize(9).font('Helvetica-Bold').text(`STEP ${st.step}: ${st.title}`, 45, stepY + 4);
-                doc.fillColor(mutedText).fontSize(8).font('Helvetica').text(`${st.algorithm} | ${st.durationMs} ms`, doc.page.width - 150, stepY + 4);
+                return false;
+            };
 
-                doc.y = stepY + 22;
-                doc.fillColor(textColor).fontSize(8).font('Helvetica').text(`Description: ${st.description}`, 45, doc.y);
-                doc.moveDown(0.3);
+            /* ============================================================
+             * GENERAL TEXT UTILITIES
+             * ============================================================
+             */
 
-                doc.fillColor(mutedText).fontSize(8).font('Helvetica-Bold').text('Outputs (Unmasked):', 45, doc.y);
-                doc.moveDown(0.2);
+            const normalizeValue = (value) => {
+                if (value === null || value === undefined) {
+                    return 'N/A';
+                }
 
-                Object.entries(st.output).forEach(([k, v]) => {
-                    if (doc.y > doc.page.height - 50) {
-                        doc.addPage();
+                // Prevent ugly JS object representations
+                if (value instanceof Uint8Array) {
+                    return Buffer.from(value).toString('hex');
+                }
+
+                if (typeof value === 'object') {
+                    if (
+                        value.constructor?.name === 'CryptoKey' ||
+                        String(value) === '[object CryptoKey]'
+                    ) {
+                        return '[CRYPTOGRAPHIC KEY OBJECT]';
                     }
-                    const valStr = String(v);
-                    doc.fillColor('#e6edf3').fontSize(7.5).font('Courier');
-                    doc.text(`  • ${k}: `, 50, doc.y, { continued: true });
-                    doc.fillColor('#7ee787').text(valStr, { width: doc.page.width - 120 });
+
+                    if (
+                        value.constructor?.name === 'ArrayBuffer' ||
+                        String(value) === '[object ArrayBuffer]'
+                    ) {
+                        try {
+                            return Buffer.from(value).toString('hex');
+                        } catch {
+                            return '[BINARY DATA]';
+                        }
+                    }
+
+                    try {
+                        return JSON.stringify(value, null, 2);
+                    } catch {
+                        return String(value);
+                    }
+                }
+
+                return String(value);
+            };
+
+            const safeText = (value) =>
+                normalizeValue(value)
+                    .replace(/\r\n/g, '\n')
+                    .replace(/\r/g, '\n');
+
+            const drawSectionTitle = (number, title, subtitle = null) => {
+                ensureSpace(subtitle ? 55 : 40);
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(13)
+                    .fillColor(C.olive)
+                    .text(`${number}. ${title.toUpperCase()}`, PAGE.left);
+
+                doc
+                    .moveTo(PAGE.left, doc.y + 5)
+                    .lineTo(PAGE.right, doc.y + 5)
+                    .lineWidth(1)
+                    .strokeColor(C.borderDark)
+                    .stroke();
+
+                doc.moveDown(0.55);
+
+                if (subtitle) {
+                    doc
+                        .font('Helvetica')
+                        .fontSize(8.5)
+                        .fillColor(C.muted)
+                        .text(subtitle, PAGE.left, doc.y, {
+                            width: PAGE.contentWidth,
+                        });
+
+                    doc.moveDown(0.55);
+                }
+            };
+
+            const drawSmallLabel = (label, x, y, width) => {
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(7)
+                    .fillColor(C.oliveMid)
+                    .text(label.toUpperCase(), x, y, {
+                        width,
+                    });
+            };
+
+            /* ============================================================
+             * DYNAMIC CARD
+             * ============================================================
+             */
+
+            const drawDynamicCard = ({
+                x = PAGE.left,
+                width = PAGE.contentWidth,
+                padding = 12,
+                background = C.paperAlt,
+                border = C.border,
+                radius = 3,
+                render,
+                estimatedHeight = 50,
+            }) => {
+                /*
+                 * We render the contents once into the real document position.
+                 * PDFKit manages text wrapping and page breaking naturally.
+                 *
+                 * Card height is calculated using a local cursor, then the
+                 * background is redrawn behind the final region.
+                 *
+                 * For very long content, use drawLongTextBlock instead.
+                 */
+
+                const startY = doc.y;
+
+                ensureSpace(estimatedHeight);
+
+                const contentStartY = doc.y + padding;
+
+                // Draw a conservative temporary background.
+                doc
+                    .roundedRect(
+                        x,
+                        startY,
+                        width,
+                        estimatedHeight,
+                        radius
+                    )
+                    .fillAndStroke(background, border);
+
+                doc.y = contentStartY;
+
+                render({
+                    x: x + padding,
+                    y: doc.y,
+                    width: width - padding * 2,
                 });
 
-                doc.moveDown(0.5);
-            });
+                const finalY = Math.max(doc.y + padding, startY + estimatedHeight);
 
-            // Cryptographic Inventory Section
-            if (doc.y > doc.page.height - 180) {
-                doc.addPage();
-            }
+                // Since PDFKit cannot move an existing rectangle after the
+                // content has been rendered, redraw the border only when the
+                // content stayed within the estimated region.
+                //
+                // Long variable sections should use drawLongTextBlock.
+                doc.y = finalY + 6;
 
-            doc.moveDown(0.5);
-            doc.fillColor(accentColor).fontSize(12).font('Helvetica-Bold').text('4. UNMASKED CRYPTOGRAPHIC MATERIAL INVENTORY', 40, doc.y);
-            doc.moveDown(0.4);
+                return finalY;
+            };
 
-            const matItems = [
-                ['Ed25519 Public Key', data.cryptographicMaterial.ed25519.edPublicKey],
-                ['Ed25519 Private Key', data.cryptographicMaterial.ed25519.edPrivateKey],
-                ['ECDH Base A Public Key', data.cryptographicMaterial.ecdh.baseAPublicKey],
-                ['ECDH Base B Public Key', data.cryptographicMaterial.ecdh.baseBPublicKey],
-                ['ECDH Shared Secret', data.cryptographicMaterial.ecdh.sharedSecret],
-                ['HKDF Salt', data.cryptographicMaterial.hkdf.salt],
-                ['HKDF Info', data.cryptographicMaterial.hkdf.info],
-                ['HKDF Session Key', data.cryptographicMaterial.hkdf.sessionKey],
-                ['RSA Public Key', data.cryptographicMaterial.rsa.rsaPublicKey],
-                ['RSA Private Key', data.cryptographicMaterial.rsa.rsaPrivateKey],
-                ['RSA Wrapped Session Key', data.cryptographicMaterial.rsa.wrappedSessionKey],
-                ['RSA Recovered Session Key', data.cryptographicMaterial.rsa.recoveredSessionKey],
-                ['AES Session Key', data.cryptographicMaterial.aes.sessionKey],
-                ['AES IV (Nonce)', data.cryptographicMaterial.aes.iv],
-                ['AES Auth Tag', data.cryptographicMaterial.aes.authTag],
-                ['AES Ciphertext', data.cryptographicMaterial.aes.ciphertext],
-                ['Ed25519 Signature', data.cryptographicMaterial.signature.signature]
+            /* ============================================================
+             * LONG TEXT BLOCK
+             *
+             * Important: this is what fixes the plaintext/ciphertext problem.
+             * Never force a fixed 45px box around arbitrary-size text.
+             * ============================================================
+             */
+
+            const drawLongTextBlock = ({
+                label,
+                value,
+                mono = false,
+                fontSize = 7.5,
+                background = C.codeBg,
+                border = C.border,
+            }) => {
+                const text = safeText(value);
+
+                // Label
+                ensureSpace(35);
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(7.5)
+                    .fillColor(C.textSoft)
+                    .text(label, PAGE.left, doc.y);
+
+                doc.moveDown(0.25);
+
+                /*
+                 * Calculate the wrapped height for the current page width.
+                 * This is the critical difference from the original code.
+                 */
+                const textWidth = PAGE.contentWidth - 20;
+
+                doc.font(mono ? 'Courier' : 'Helvetica').fontSize(fontSize);
+
+                const height = doc.heightOfString(text, {
+                    width: textWidth,
+                    lineGap: 1.5,
+                    paragraphGap: 2,
+                });
+
+                /*
+                 * If it does not fit on the current page and isn't gigantic,
+                 * start a new page first.
+                 */
+                const available = PAGE.bottom - doc.y;
+
+                if (height + 30 > available && height < PAGE.height * 0.8) {
+                    newPage();
+                }
+
+                const boxTop = doc.y;
+                const boxHeight = Math.min(
+                    Math.max(height + 18, 35),
+                    PAGE.bottom - boxTop
+                );
+
+                doc
+                    .rect(PAGE.left, boxTop, PAGE.contentWidth, boxHeight)
+                    .fillAndStroke(background, border);
+
+                doc
+                    .font(mono ? 'Courier' : 'Helvetica')
+                    .fontSize(fontSize)
+                    .fillColor(mono ? C.codeText : C.text)
+                    .text(text, PAGE.left + 10, boxTop + 9, {
+                        width: textWidth,
+                        lineGap: 1.5,
+                        paragraphGap: 2,
+                    });
+
+                doc.y = Math.max(
+                    doc.y + 3,
+                    boxTop + boxHeight + 8
+                );
+            };
+
+            /* ============================================================
+             * KEY-VALUE ROW
+             * ============================================================
+             */
+
+            const drawKeyValue = ({
+                label,
+                value,
+                x = PAGE.left,
+                width = PAGE.contentWidth,
+                mono = false,
+            }) => {
+                const text = safeText(value);
+
+                const labelWidth = 145;
+                const valueWidth = width - labelWidth - 10;
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(8)
+                    .fillColor(C.textSoft)
+                    .text(label, x, doc.y, {
+                        width: labelWidth,
+                    });
+
+                doc
+                    .font(mono ? 'Courier' : 'Helvetica')
+                    .fontSize(mono ? 7 : 8)
+                    .fillColor(C.text)
+                    .text(text, x + labelWidth, doc.y, {
+                        width: valueWidth,
+                        lineGap: 1,
+                    });
+
+                doc.moveDown(0.35);
+            };
+
+            /* ============================================================
+             * STATUS BADGE
+             * ============================================================
+             */
+
+            const drawStatusBadge = (label, passed) => {
+                const text = passed ? 'PASSED' : 'FAILED';
+                const bg = passed ? C.successBg : C.dangerBg;
+                const color = passed ? C.success : C.danger;
+
+                const width = 65;
+                const height = 18;
+
+                doc
+                    .roundedRect(
+                        PAGE.right - width,
+                        doc.y - 1,
+                        width,
+                        height,
+                        3
+                    )
+                    .fill(bg)
+                    .strokeColor(color)
+                    .stroke();
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(7)
+                    .fillColor(color)
+                    .text(text, PAGE.right - width, doc.y + 5, {
+                        width,
+                        align: 'center',
+                    });
+            };
+
+            /* ============================================================
+             * TITLE / EXECUTIVE HEADER
+             * ============================================================
+             */
+
+            doc
+                .rect(0, 0, PAGE.width, 105)
+                .fill(C.oliveDark);
+
+            doc
+                .font('Helvetica-Bold')
+                .fontSize(16)
+                .fillColor(C.white)
+                .text(
+                    'SECURENET DEFENCE COMMUNICATION NETWORK',
+                    PAGE.left,
+                    25,
+                    {
+                        width: PAGE.contentWidth,
+                    }
+                );
+
+            doc
+                .font('Helvetica')
+                .fontSize(9)
+                .fillColor('#D9DDC9')
+                .text(
+                    'CRYPTOGRAPHIC EXECUTION & VERIFICATION REPORT',
+                    PAGE.left,
+                    50,
+                    {
+                        width: PAGE.contentWidth,
+                    }
+                );
+
+            doc
+                .font('Courier')
+                .fontSize(7.5)
+                .fillColor(C.oliveSoft)
+                .text(
+                    `EXECUTION ID // ${executionId}`,
+                    PAGE.left,
+                    75
+                );
+
+            doc.y = 125;
+
+            /* ============================================================
+             * 1. EXECUTIVE SUMMARY
+             * ============================================================
+             */
+
+            drawSectionTitle(
+                1,
+                'Executive Summary',
+                'High-level execution, verification, and performance information.'
+            );
+
+            ensureSpace(110);
+
+            const summaryTop = doc.y;
+            const summaryHeight = 105;
+
+            doc
+                .roundedRect(
+                    PAGE.left,
+                    summaryTop,
+                    PAGE.contentWidth,
+                    summaryHeight,
+                    4
+                )
+                .fillAndStroke(C.paperAlt, C.border);
+
+            const col1 = PAGE.left + 14;
+            const col2 = PAGE.left + PAGE.contentWidth / 2 + 10;
+
+            const rowY = [
+                summaryTop + 14,
+                summaryTop + 34,
+                summaryTop + 54,
+                summaryTop + 74,
             ];
 
-            matItems.forEach(([label, val]) => {
-                if (doc.y > doc.page.height - 40) {
-                    doc.addPage();
-                }
-                doc.fillColor('#e6edf3').fontSize(8).font('Helvetica-Bold').text(`${label}:`, 45, doc.y);
-                doc.fillColor('#7ee787').fontSize(7.5).font('Courier').text(val || 'N/A', 55, doc.y + 10, {
-                    width: doc.page.width - 110
+            doc.font('Helvetica-Bold').fontSize(7.5);
+
+            // Left
+            drawSmallLabel('Execution ID', col1, rowY[0], 180);
+            doc
+                .font('Courier')
+                .fontSize(7)
+                .fillColor(C.text)
+                .text(data.summary.executionId, col1, rowY[0] + 9, {
+                    width: 190,
                 });
-                doc.moveDown(0.4);
+
+            drawSmallLabel('Filename', col1, rowY[1], 180);
+            doc
+                .font('Helvetica')
+                .fontSize(8)
+                .fillColor(C.text)
+                .text(
+                    `${data.summary.filename} (${data.summary.inputSize} bytes)`,
+                    col1,
+                    rowY[1] + 9,
+                    {
+                        width: 190,
+                    }
+                );
+
+            drawSmallLabel('Created At', col1, rowY[2], 180);
+            doc
+                .font('Courier')
+                .fontSize(7)
+                .fillColor(C.text)
+                .text(data.summary.createdAt, col1, rowY[2] + 9, {
+                    width: 190,
+                });
+
+            drawSmallLabel('Completed At', col1, rowY[3], 180);
+            doc
+                .font('Courier')
+                .fontSize(7)
+                .fillColor(C.text)
+                .text(data.summary.completedAt || 'N/A', col1, rowY[3] + 9, {
+                    width: 190,
+                });
+
+            // Right
+            drawSmallLabel('Status', col2, rowY[0], 180);
+            doc
+                .font('Helvetica-Bold')
+                .fontSize(8)
+                .fillColor(C.text)
+                .text(
+                    String(data.summary.status || 'UNKNOWN').toUpperCase(),
+                    col2,
+                    rowY[0] + 9,
+                    {
+                        width: 180,
+                    }
+                );
+
+            drawSmallLabel('Verification', col2, rowY[1], 180);
+            doc
+                .font('Helvetica-Bold')
+                .fontSize(8)
+                .fillColor(C.olive)
+                .text(
+                    data.verification.finalStatus || 'N/A',
+                    col2,
+                    rowY[1] + 9,
+                    {
+                        width: 180,
+                    }
+                );
+
+            drawSmallLabel('Total Pipeline Time', col2, rowY[2], 180);
+            doc
+                .font('Courier')
+                .fontSize(7)
+                .fillColor(C.text)
+                .text(
+                    `${data.benchmark?.timing?.totalElapsedMs ?? 'N/A'} ms`,
+                    col2,
+                    rowY[2] + 9,
+                    {
+                        width: 180,
+                    }
+                );
+
+            drawSmallLabel('Throughput', col2, rowY[3], 180);
+            doc
+                .font('Courier')
+                .fontSize(7)
+                .fillColor(C.text)
+                .text(
+                    `${data.benchmark?.analysis?.throughputKBps ?? 'N/A'} KB/s`,
+                    col2,
+                    rowY[3] + 9,
+                    {
+                        width: 180,
+                    }
+                );
+
+            doc.y = summaryTop + summaryHeight + 18;
+
+            /* ============================================================
+             * 2. MISSION INPUT
+             * ============================================================
+             */
+
+            drawSectionTitle(
+                2,
+                'Mission Input Plaintext',
+                'Original plaintext supplied to the cryptographic pipeline.'
+            );
+
+            drawLongTextBlock({
+                label: 'PLAINTEXT',
+                value: data.input.plaintext,
+                mono: true,
+                fontSize: 7.5,
             });
 
-            // Integrity Verification Section
-            if (doc.y > doc.page.height - 120) {
-                doc.addPage();
-            }
+            /* ============================================================
+             * 3. PIPELINE
+             * ============================================================
+             */
 
-            doc.moveDown(0.5);
-            doc.fillColor(accentColor).fontSize(12).font('Helvetica-Bold').text('5. INTEGRITY VERIFICATION MATRIX', 40, doc.y);
-            doc.moveDown(0.4);
+            drawSectionTitle(
+                3,
+                'Step-by-Step Cryptographic Pipeline',
+                'Nine-stage execution trace from authentication through verified decryption.'
+            );
 
-            const verifY = doc.y;
-            doc.rect(40, verifY, doc.page.width - 80, 55).fillAndStroke('#161b22', '#30363d');
-            doc.fillColor(textColor).fontSize(9).font('Helvetica');
-            doc.text(`Shared Secrets Match    : ${data.verification.sharedSecretsMatch ? 'PASSED ✅' : 'FAILED ❌'}`, 50, verifY + 8);
-            doc.text(`Digital Signature Valid : ${data.verification.signatureValid ? 'PASSED ✅' : 'FAILED ❌'}`, 50, verifY + 22);
-            doc.text(`AES Decryption Success  : ${data.verification.decryptionSuccess ? 'PASSED ✅' : 'FAILED ❌'}`, 50, verifY + 36);
+            data.steps.forEach((step) => {
+                /*
+                 * Reserve enough space for the STEP header.
+                 * The detailed output is allowed to span pages naturally.
+                 */
+                ensureSpace(55);
 
-            doc.text(`Plaintext Integrity : ${data.verification.plaintextMatch ? 'MATCHED ✅' : 'MISMATCHED ❌'}`, 300, verifY + 8);
-            doc.text(`Final Status        : ${data.verification.finalStatus}`, 300, verifY + 22);
+                const headerY = doc.y;
 
-            doc.y = verifY + 65;
+                doc
+                    .roundedRect(
+                        PAGE.left,
+                        headerY,
+                        PAGE.contentWidth,
+                        23,
+                        3
+                    )
+                    .fill(C.oliveDark);
 
-            // Performance Benchmark Section
-            if (doc.y > doc.page.height - 160) {
-                doc.addPage();
-            }
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(8.5)
+                    .fillColor(C.white)
+                    .text(
+                        `STEP ${step.step}  /  ${step.title}`,
+                        PAGE.left + 9,
+                        headerY + 7,
+                        {
+                            width: PAGE.contentWidth * 0.65,
+                        }
+                    );
 
-            doc.fillColor(accentColor).fontSize(12).font('Helvetica-Bold').text('6. PERFORMANCE BENCHMARK & METRICS', 40, doc.y);
-            doc.moveDown(0.4);
+                doc
+                    .font('Courier')
+                    .fontSize(7)
+                    .fillColor(C.oliveSoft)
+                    .text(
+                        `${step.algorithm}  |  ${step.durationMs} ms`,
+                        PAGE.left + PAGE.contentWidth * 0.65,
+                        headerY + 7,
+                        {
+                            width: PAGE.contentWidth * 0.32,
+                            align: 'right',
+                        }
+                    );
 
-            const benchOps = data.benchmark.timing?.operations || {};
-            doc.fillColor(textColor).fontSize(8.5).font('Helvetica-Bold');
-            doc.text('Operation Name', 50, doc.y);
-            doc.text('Duration (ms)', 250, doc.y);
-            doc.moveDown(0.3);
+                doc.y = headerY + 31;
 
-            Object.entries(benchOps).forEach(([op, timeMs]) => {
-                if (doc.y > doc.page.height - 40) {
-                    doc.addPage();
+                // Description
+                doc
+                    .font('Helvetica')
+                    .fontSize(8)
+                    .fillColor(C.textSoft)
+                    .text(`Description: ${safeText(step.description)}`, {
+                        width: PAGE.contentWidth,
+                        lineGap: 1.5,
+                    });
+
+                doc.moveDown(0.45);
+
+                drawSmallLabel(
+                    'Outputs',
+                    PAGE.left,
+                    doc.y,
+                    PAGE.contentWidth
+                );
+
+                doc.moveDown(0.35);
+
+                /*
+                 * IMPORTANT:
+                 * Each output is rendered as an actual wrapped block.
+                 * This prevents giant ciphertext from crossing into
+                 * the next step or heading.
+                 */
+                for (const [key, rawValue] of Object.entries(
+                    step.output || {}
+                )) {
+                    const value = safeText(rawValue);
+
+                    ensureSpace(35);
+
+                    doc
+                        .font('Helvetica-Bold')
+                        .fontSize(7.5)
+                        .fillColor(C.textSoft)
+                        .text(`${key}:`, PAGE.left + 4, doc.y);
+
+                    doc.moveDown(0.15);
+
+                    doc
+                        .font('Courier')
+                        .fontSize(7)
+                        .fillColor(C.codeText);
+
+                    const valueHeight = doc.heightOfString(value, {
+                        width: PAGE.contentWidth - 14,
+                        lineGap: 1.2,
+                    });
+
+                    const available = PAGE.bottom - doc.y;
+
+                    if (
+                        valueHeight + 22 > available &&
+                        valueHeight < PAGE.height * 0.75
+                    ) {
+                        newPage();
+
+                        drawSmallLabel(
+                            `${key} (continued)`,
+                            PAGE.left,
+                            doc.y,
+                            PAGE.contentWidth
+                        );
+
+                        doc.moveDown(0.35);
+                    }
+
+                    // Light code area
+                    const codeTop = doc.y;
+
+                    doc
+                        .rect(
+                            PAGE.left,
+                            codeTop,
+                            PAGE.contentWidth,
+                            Math.max(valueHeight + 12, 24)
+                        )
+                        .fillAndStroke(C.codeBg, C.border);
+
+                    doc
+                        .font('Courier')
+                        .fontSize(7)
+                        .fillColor(C.codeText)
+                        .text(value, PAGE.left + 7, codeTop + 6, {
+                            width: PAGE.contentWidth - 14,
+                            lineGap: 1.2,
+                        });
+
+                    doc.y = Math.max(
+                        doc.y + 5,
+                        codeTop + valueHeight + 14
+                    );
+
+                    doc.moveDown(0.2);
                 }
-                doc.fillColor(mutedText).fontSize(8).font('Helvetica').text(op, 50, doc.y);
-                doc.fillColor('#7ee787').fontSize(8).font('Courier').text(`${timeMs} ms`, 250, doc.y);
-                doc.moveDown(0.2);
+
+                // Step separator
+                doc
+                    .moveTo(PAGE.left, doc.y + 2)
+                    .lineTo(PAGE.right, doc.y + 2)
+                    .strokeColor(C.border)
+                    .lineWidth(0.5)
+                    .stroke();
+
+                doc.moveDown(0.7);
             });
 
-            doc.moveDown(0.4);
-            doc.fillColor(textColor).fontSize(8.5).font('Helvetica');
-            doc.text(`Encryption Phase Total  : ${data.benchmark.timing?.encryptionPhaseMs} ms`, 50, doc.y);
-            doc.text(`Decryption Phase Total  : ${data.benchmark.timing?.decryptionPhaseMs} ms`, 50, doc.y + 12);
-            doc.text(`Total Elapsed Pipeline  : ${data.benchmark.timing?.totalElapsedMs} ms`, 50, doc.y + 24);
-            doc.text(`Throughput              : ${data.benchmark.analysis?.throughputKBps} KB/sec`, 50, doc.y + 36);
+            /* ============================================================
+             * 4. CRYPTOGRAPHIC INVENTORY
+             * ============================================================
+             */
+
+            drawSectionTitle(
+                4,
+                'Cryptographic Material Inventory',
+                'Cryptographic values captured during this execution.'
+            );
+
+            const material = data.cryptographicMaterial;
+
+            const inventory = [
+                [
+                    'Ed25519 Public Key',
+                    material?.ed25519?.edPublicKey,
+                    true,
+                ],
+                [
+                    'Ed25519 Private Key',
+                    material?.ed25519?.edPrivateKey,
+                    true,
+                ],
+                [
+                    'ECDH Base A Public Key',
+                    material?.ecdh?.baseAPublicKey,
+                    true,
+                ],
+                [
+                    'ECDH Base B Public Key',
+                    material?.ecdh?.baseBPublicKey,
+                    true,
+                ],
+                [
+                    'ECDH Shared Secret',
+                    material?.ecdh?.sharedSecret,
+                    true,
+                ],
+                [
+                    'HKDF Salt',
+                    material?.hkdf?.salt,
+                    true,
+                ],
+                [
+                    'HKDF Info',
+                    material?.hkdf?.info,
+                    true,
+                ],
+                [
+                    'HKDF Session Key',
+                    material?.hkdf?.sessionKey,
+                    true,
+                ],
+                [
+                    'RSA Public Key',
+                    material?.rsa?.rsaPublicKey,
+                    true,
+                ],
+                [
+                    'RSA Private Key',
+                    material?.rsa?.rsaPrivateKey,
+                    true,
+                ],
+                [
+                    'RSA Wrapped Session Key',
+                    material?.rsa?.wrappedSessionKey,
+                    true,
+                ],
+                [
+                    'RSA Recovered Session Key',
+                    material?.rsa?.recoveredSessionKey,
+                    true,
+                ],
+                [
+                    'AES Session Key',
+                    material?.aes?.sessionKey,
+                    true,
+                ],
+                [
+                    'AES IV (Nonce)',
+                    material?.aes?.iv,
+                    true,
+                ],
+                [
+                    'AES Auth Tag',
+                    material?.aes?.authTag,
+                    true,
+                ],
+                [
+                    'AES Ciphertext',
+                    material?.aes?.ciphertext,
+                    true,
+                ],
+                [
+                    'Ed25519 Signature',
+                    material?.signature?.signature,
+                    true,
+                ],
+            ];
+
+            inventory.forEach(([label, value, mono]) => {
+                drawLongTextBlock({
+                    label,
+                    value,
+                    mono,
+                    fontSize: 7,
+                });
+            });
+
+            /* ============================================================
+             * 5. VERIFICATION MATRIX
+             * ============================================================
+             */
+
+            drawSectionTitle(
+                5,
+                'Integrity Verification Matrix',
+                'Cryptographic verification results produced by the execution.'
+            );
+
+            ensureSpace(130);
+
+            const verificationTop = doc.y;
+            const verificationRows = [
+                [
+                    'Shared Secrets Match',
+                    data.verification.sharedSecretsMatch,
+                ],
+                [
+                    'Digital Signature Valid',
+                    data.verification.signatureValid,
+                ],
+                [
+                    'AES Decryption Success',
+                    data.verification.decryptionSuccess,
+                ],
+                [
+                    'Plaintext Integrity Match',
+                    data.verification.plaintextMatch,
+                ],
+            ];
+
+            const rowHeight = 30;
+            const cardHeight = verificationRows.length * rowHeight + 26;
+
+            doc
+                .roundedRect(
+                    PAGE.left,
+                    verificationTop,
+                    PAGE.contentWidth,
+                    cardHeight,
+                    4
+                )
+                .fillAndStroke(C.paperAlt, C.border);
+
+            verificationRows.forEach(([label, passed], index) => {
+                const y = verificationTop + 13 + index * rowHeight;
+
+                doc
+                    .font('Helvetica')
+                    .fontSize(8.5)
+                    .fillColor(C.text)
+                    .text(label, PAGE.left + 12, y + 4, {
+                        width: PAGE.contentWidth - 100,
+                    });
+
+                const badgeX = PAGE.right - 78;
+
+                const bg = passed ? C.successBg : C.dangerBg;
+                const color = passed ? C.success : C.danger;
+
+                doc
+                    .roundedRect(badgeX, y, 64, 18, 3)
+                    .fillAndStroke(bg, color);
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(7)
+                    .fillColor(color)
+                    .text(
+                        passed ? 'PASSED' : 'FAILED',
+                        badgeX,
+                        y + 5,
+                        {
+                            width: 64,
+                            align: 'center',
+                        }
+                    );
+            });
+
+            doc.y = verificationTop + cardHeight + 15;
+
+            // Final status row
+            const finalPassed =
+                data.verification.finalStatus === 'TRANSMISSION VERIFIED';
+
+            doc
+                .font('Helvetica-Bold')
+                .fontSize(9)
+                .fillColor(C.text)
+                .text('FINAL STATUS');
+
+            doc.moveDown(0.25);
+
+            doc
+                .font('Helvetica-Bold')
+                .fontSize(11)
+                .fillColor(finalPassed ? C.success : C.danger)
+                .text(data.verification.finalStatus || 'UNKNOWN');
+
+            doc.moveDown(1);
+
+            /* ============================================================
+             * 6. PERFORMANCE
+             * ============================================================
+             */
+
+            drawSectionTitle(
+                6,
+                'Performance Benchmark & Metrics',
+                'Measured duration of individual cryptographic operations and overall pipeline efficiency.'
+            );
+
+            ensureSpace(80);
+
+            const benchOps = data.benchmark?.timing?.operations || {};
+
+            const colOperation = PAGE.left;
+            const colDuration = PAGE.right - 110;
+
+            // Table header
+            doc
+                .rect(
+                    PAGE.left,
+                    doc.y,
+                    PAGE.contentWidth,
+                    22
+                )
+                .fill(C.oliveDark);
+
+            doc
+                .font('Helvetica-Bold')
+                .fontSize(7.5)
+                .fillColor(C.white)
+                .text('OPERATION', colOperation + 8, doc.y + 7);
+
+            doc
+                .text('DURATION', colDuration, doc.y + 7, {
+                    width: 100,
+                    align: 'right',
+                });
+
+            doc.y += 22;
+
+            let operationIndex = 0;
+
+            Object.entries(benchOps).forEach(([operation, timeMs]) => {
+                if (PAGE.bottom - doc.y < 24) {
+                    newPage();
+                }
+
+                const rowY = doc.y;
+
+                if (operationIndex % 2 === 0) {
+                    doc
+                        .rect(
+                            PAGE.left,
+                            rowY,
+                            PAGE.contentWidth,
+                            21
+                        )
+                        .fill(C.paperAlt);
+                }
+
+                doc
+                    .font('Helvetica')
+                    .fontSize(8)
+                    .fillColor(C.text)
+                    .text(operation, colOperation + 8, rowY + 6);
+
+                doc
+                    .font('Courier')
+                    .fontSize(7.5)
+                    .fillColor(C.olive)
+                    .text(`${timeMs} ms`, colDuration, rowY + 6, {
+                        width: 100,
+                        align: 'right',
+                    });
+
+                doc.y = rowY + 21;
+                operationIndex += 1;
+            });
+
+            doc.moveDown(0.7);
+
+            // Summary metrics
+            const metrics = [
+                [
+                    'Encryption Phase',
+                    `${data.benchmark?.timing?.encryptionPhaseMs ?? 'N/A'} ms`,
+                ],
+                [
+                    'Decryption Phase',
+                    `${data.benchmark?.timing?.decryptionPhaseMs ?? 'N/A'} ms`,
+                ],
+                [
+                    'Total Pipeline',
+                    `${data.benchmark?.timing?.totalElapsedMs ?? 'N/A'} ms`,
+                ],
+                [
+                    'Throughput',
+                    `${data.benchmark?.analysis?.throughputKBps ?? 'N/A'} KB/s`,
+                ],
+            ];
+
+            ensureSpace(metrics.length * 28 + 25);
+
+            metrics.forEach(([label, value]) => {
+                const y = doc.y;
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(8)
+                    .fillColor(C.textSoft)
+                    .text(label, PAGE.left + 10, y + 5, {
+                        width: 180,
+                    });
+
+                doc
+                    .font('Courier')
+                    .fontSize(8)
+                    .fillColor(C.olive)
+                    .text(value, PAGE.right - 150, y + 5, {
+                        width: 140,
+                        align: 'right',
+                    });
+
+                doc
+                    .moveTo(PAGE.left, y + 24)
+                    .lineTo(PAGE.right, y + 24)
+                    .lineWidth(0.5)
+                    .strokeColor(C.border)
+                    .stroke();
+
+                doc.y = y + 28;
+            });
+
+            /* ============================================================
+             * OPTIONAL FINAL PLAINTEXT RESULT
+             * ============================================================
+             */
+
+            if (data.finalResult?.plaintext || data.decryption?.plaintext) {
+                drawSectionTitle(
+                    7,
+                    'Recovered Plaintext',
+                    'Plaintext reconstructed after RSA session-key recovery and AES-GCM verification.'
+                );
+
+                drawLongTextBlock({
+                    label: 'DECRYPTED PLAINTEXT',
+                    value:
+                        data.finalResult?.plaintext ||
+                        data.decryption?.plaintext,
+                    mono: true,
+                    fontSize: 7.5,
+                });
+            }
+
+            /* ============================================================
+             * FINAL DOCUMENT NOTE
+             * ============================================================
+             */
+
+            ensureSpace(70);
+
+            doc
+                .moveTo(PAGE.left, doc.y)
+                .lineTo(PAGE.right, doc.y)
+                .lineWidth(1)
+                .strokeColor(C.olive)
+                .stroke();
+
+            doc.moveDown(0.8);
+
+            doc
+                .font('Helvetica')
+                .fontSize(7)
+                .fillColor(C.muted)
+                .text(
+                    'Generated by SecureNet Defence Communication Network. ' +
+                    'This report represents the recorded execution state and benchmark measurements for the specified transmission.',
+                    PAGE.left,
+                    doc.y,
+                    {
+                        width: PAGE.contentWidth,
+                        lineGap: 2,
+                    }
+                );
+
+            /* ============================================================
+             * END
+             * ============================================================
+             */
 
             doc.end();
         } catch (err) {

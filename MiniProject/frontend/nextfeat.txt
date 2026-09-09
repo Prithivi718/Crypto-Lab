@@ -1,171 +1,266 @@
-Yep. Give your coding agent this **exact prompt**:
+Yep — and **the dots should absolutely render behind the text/content**, not as a panel sitting over it. The React Bits Dot Grid is a canvas/background-style component, so the clean implementation is to make it an absolute background layer inside the intro, while the existing initialization UI remains above it. ([shadcnregistry][1])
+
+Use this prompt:
 
 ````text
-Fix the SecureNet intro → Home transition.
+Add React Bits `DotGrid` as the animated background for the SecureNet cinematic intro.
 
-CURRENT PROBLEM:
-The project currently uses a separate `HomeBootReveal.jsx` component after the intro logo reaches the navbar. This creates a fake full-screen military/radar/grid reconstruction overlay. That is NOT what I want.
+REFERENCE:
+React Bits Dot Grid:
+https://reactbits.dev/backgrounds/dot-grid
 
-I do NOT want a new boot animation.
+DEPENDENCY:
+Run:
+npm install gsap
 
-I want the EXISTING landing page's React Bits `GridDistortion` effect to perform the transition naturally.
+GSAP is required by the React Bits Dot Grid implementation. :contentReference[oaicite:1]{index=1}
 
-CURRENT REAL HOME IMPLEMENTATION:
-`LandingPage.jsx` already renders:
+IMPORTANT DESIGN GOAL:
+I want the Dot Grid to behave like a REAL BACKGROUND, not a card, not a separate overlay panel, and not something that blocks the intro content.
 
-```jsx
-<GridDistortion
-    imageSrc={landingImage}
-    grid={20}
-    mouse={0.20}
-    strength={0.1}
-    relaxation={0.95}
-/>
+The dots must visually continue behind:
+- SECURENET logo
+- DEFENCE COMMUNICATIONS subtitle
+- initialization status box
+- INITIALIZE SECURE CHANNEL button
+- SKIP INTRO button
+- status/microcopy
+- VOICE // ON control
+
+The text/UI must remain fully readable above the dots.
+
+CURRENT SCREEN:
+The intro currently has a very dark tactical background with centered SecureNet branding and initialization controls.
+
+DO NOT redesign the current layout.
+
+IMPLEMENTATION:
+
+1. Install GSAP:
+```bash
+npm install gsap
 ````
 
-This existing `GridDistortion` is the visual effect that should be used for the Home reveal.
+2. Add the React Bits `DotGrid` component using the official React Bits implementation/pattern from:
+   [https://reactbits.dev/backgrounds/dot-grid](https://reactbits.dev/backgrounds/dot-grid)
 
-REQUIRED FINAL FLOW:
+Do not invent a different dot-grid implementation unless the existing React Bits component cannot be integrated cleanly.
 
-TTS
-↓
-center SecureNet logo
-↓
-logo smoothly moves to navbar position
-↓
-intro overlay disappears
-↓
-ACTUAL LandingPage becomes visible/mounts
-↓
-existing `GridDistortion` naturally initializes/resolves
-↓
-grid distortion resolves into the actual `landingImage`
-↓
-Home is fully visible
+3. Place DotGrid INSIDE the SecureNet intro as the lowest visual layer.
 
-Do NOT create another grid animation, radar animation, scanline animation, telemetry animation, or reconstruction overlay.
+Desired layer structure:
 
-CHANGES REQUIRED:
-
-1. REMOVE `HomeBootReveal` from the flow completely.
-
-   * Stop importing `HomeBootReveal` in `SecureNetIntro.jsx`.
-   * Remove the `HOME_BOOT` phase.
-   * Remove the `<HomeBootReveal />` render block.
-   * `HomeBootReveal.jsx` and its CSS should no longer be used.
-   * Do not replace it with another fake overlay.
-
-2. KEEP `IntroLogoTransition.jsx`.
-
-   * The existing center-logo → navbar-logo FLIP transition should remain.
-   * Once that animation completes, the intro should finish immediately.
-
-3. AFTER `handleTransitionComplete`:
-
-   * transition directly to the normal completed/entered state.
-   * call `onIntroComplete()`.
-   * preserve `sessionStorage` behavior so the intro does not appear again during the session.
-   * do not insert another visual layer between the logo transition and Home.
-
-4. MAKE THE REAL `LandingPage` reveal/mount at the correct time.
-
-   * The existing `LandingPage.jsx` must remain the actual Home page.
-   * Do not duplicate LandingPage markup inside the intro.
-   * Do not recreate GridDistortion inside `SecureNetIntro`.
-   * The parent/app-level rendering logic should decide when LandingPage is revealed.
-
-5. IMPORTANT:
-   The existing `GridDistortion` component should get a fresh mount/reinitialization when Home is revealed after the intro, so its natural distortion/image-resolution effect plays as the Home appears.
-
-   Preferred approach:
-
-   * conditionally mount/reveal the actual `LandingPage` only after intro completion, OR
-   * use a controlled remount/key if the current app architecture already keeps LandingPage mounted.
-
-   Choose the cleanest approach based on the existing app structure.
-   Do NOT hack the visual effect with CSS pretending to be GridDistortion.
-
-6. PRESERVE THE EXISTING LANDING PAGE.
-   Do not redesign it.
-   Keep:
-
-   * existing `LandingPage.jsx`
-   * existing `GridDistortion`
-   * existing hero image
-   * existing typography
-   * existing navbar
-   * existing hero content
-   * existing buttons
-   * existing overlays/vignette
-
-7. PRESERVE INTRO BEHAVIOR.
-   Keep:
-
-   * readiness states
-   * Initialize/Start Progress button
-   * hammer audio once
-   * forging/progress sequence
-   * secure channel ready
-   * Enter SecureNet button
-   * TTS sequence
-   * centered logo reveal
-   * logo transition to navbar
-   * Skip Intro behavior
-   * sessionStorage behavior
-
-8. SKIP INTRO:
-   Skip should still go directly to the actual Home page.
-   It must NOT show any HomeBootReveal/fake reconstruction layer.
-
-9. DO NOT CHANGE UNRELATED CODE.
-   Only modify the files/components necessary to fix this transition and the Home mount lifecycle.
-
-EXPECTED RESULT:
-When the logo reaches the navbar, I should see the REAL landing page come in through its EXISTING `GridDistortion`.
-
-Visually it should feel like:
-
-```
-[grid/distorted field]
-        ↓
-image naturally resolves
-        ↓
-REAL SecureNet landing page
+```text
+securenet-intro-overlay
+│
+├── DotGrid background
+│
+├── existing dark/gradient treatment if needed
+│
+├── existing intro content
+│   ├── SecureNet logo
+│   ├── Defence Communications
+│   ├── initialization panel
+│   ├── Initialize Secure Channel
+│   ├── Skip Intro
+│   └── other controls
+│
+└── existing interaction controls
 ```
 
-NOT:
+CSS layering should effectively be:
 
-```
-[fake military radar overlay]
-        ↓
-[scanline/reconstruction animation]
-        ↓
-[landing page appears]
-```
+```text
+DotGrid:
+    position: absolute/fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
 
-The existing React Bits `GridDistortion` is the source of truth for the Home reveal effect.
+Content:
+    position: relative;
+    z-index: 1;
 
-Before editing:
-
-* inspect the app/root routing/rendering structure
-* identify where `SecureNetIntro` and `LandingPage` are mounted
-* determine whether LandingPage is currently mounted underneath the intro or only mounted after intro completion
-
-Then implement the smallest clean architectural fix.
-
-After editing, verify:
-
-* no `HomeBootReveal` is rendered anywhere
-* no duplicate GridDistortion exists
-* no duplicate LandingPage exists
-* logo transition still reaches navbar correctly
-* intro disappears cleanly
-* actual LandingPage mounts/reveals
-* GridDistortion starts naturally when Home is revealed
-* Skip Intro still works
-* returning/reloading in the same session bypasses intro
-
+Buttons:
+    remain clickable;
 ```
 
-**One thing to emphasize to the agent:** don't let it “fix” this by making `HomeBootReveal` look more like `GridDistortion`. **The entire `HomeBootReveal` concept should disappear.** The actual `LandingPage → GridDistortion` instance is the animation.
+Do NOT set DotGrid above the content.
+
+4. The Dot Grid should fill the ENTIRE intro viewport.
+
+It must not be constrained to:
+
+* the central card
+* the initialization box
+* a small rectangle
+* a fixed-width container
+
+It should span edge-to-edge behind the entire screen.
+
+5. Keep the existing dark tactical aesthetic.
+
+The dots should be subtle:
+
+* restrained military olive/gray tone
+* low visual intensity
+* no neon cyberpunk appearance
+* no bright gaming aesthetic
+* no excessive glow
+* no distracting particle explosion
+
+The screenshot's current background is intentionally dark. Preserve that mood.
+
+6. IMPORTANT:
+   The dots need to remain visible BEHIND the text.
+
+Do NOT solve readability by putting a large opaque background behind every piece of text.
+
+Instead:
+
+* keep the DotGrid visible through the negative space around the content
+* use subtle opacity/gradient/vignette where necessary
+* preserve text contrast naturally
+
+The visual should feel like the UI is sitting inside an active secure command environment.
+
+7. Keep the DotGrid interaction behavior from React Bits.
+
+Do not remove the intended cursor interaction/animation just because it is behind the content.
+
+However:
+
+* the DotGrid itself must use `pointer-events: none` if required so it does not intercept button clicks
+* the intro buttons must remain completely functional
+
+If the React Bits DotGrid implementation needs pointer events for its own mouse tracking, use the cleanest architecture that preserves the effect without blocking interaction.
+
+8. Make sure the DotGrid begins when the intro is shown and is cleaned up correctly when the intro is removed.
+
+No memory leaks.
+No orphaned GSAP animations.
+No duplicate animation instances after React re-renders.
+
+Use proper React cleanup.
+
+9. Do not change the cinematic state machine.
+
+Preserve:
+
+* readiness sequence
+* Initialize Secure Channel
+* hammer audio behavior
+* progress/forging sequence
+* secure channel ready
+* Enter SecureNet
+* TTS
+* center logo
+* logo → navbar transition
+* Skip Intro
+* sessionStorage behavior
+
+10. Do not bring back `HomeBootReveal`.
+
+That previous fake radar/grid reconstruction is unwanted.
+
+The DotGrid belongs ONLY to the SecureNet INTRO experience.
+
+The actual Home transition remains separate:
+logo → navbar → actual LandingPage → existing GridDistortion.
+
+11. Avoid duplicated backgrounds.
+
+Inspect the existing:
+
+* `SecureNetIntro.jsx`
+* `SecureNetIntro.css`
+* `IntroProgress`
+* `IntroSpeech`
+
+If one of them already creates a full-screen opaque background that would completely hide the dots, adjust only the necessary background transparency/layering.
+
+Do not remove the tactical styling unnecessarily.
+
+12. Desired visual hierarchy:
+
+```text
+FULL SCREEN
+┌─────────────────────────────────────────────┐
+│  ·   ·    ·     ·    ·    ·     ·          │
+│      ·   ·    ·    ·      ·                 │
+│                                             │
+│                 SECURENET                   │
+│            DEFENCE COMMUNICATIONS          │
+│                                             │
+│          ┌──────────────────────┐           │
+│          │ INITIALIZING ...     │           │
+│          │ AUTHENTICATION READY │           │
+│          │ KEY EXCHANGE READY   │           │
+│          │ ENCRYPTION READY     │           │
+│          └──────────────────────┘           │
+│                                             │
+│          INITIALIZE SECURE CHANNEL         │
+│                                             │
+│                 SKIP INTRO                  │
+│                                             │
+│    ·       ·      ·      ·       ·         │
+└─────────────────────────────────────────────┘
 ```
+
+The dots are a background FIELD extending behind the whole composition.
+
+13. The final appearance should be subtle and premium:
+
+* dark tactical command-center atmosphere
+* sparse animated dot field
+* content remains the visual focus
+* movement is noticeable but not distracting
+* no giant grid lines
+* no radar ring
+* no scanline recreation
+* no fake "GRID RECONSTRUCTION" text
+* no additional boot HUD
+
+14. Keep the code modular.
+
+Prefer:
+
+```text
+components/intro/
+    SecureNetIntro.jsx
+    SecureNetIntro.css
+    IntroProgress.jsx
+    IntroSpeech.jsx
+```
+
+Add a separate reusable DotGrid wrapper/component only if useful, for example:
+
+```text
+components/backgrounds/DotGrid.jsx
+components/backgrounds/DotGrid.css
+```
+
+Do not dump the DotGrid implementation directly into `SecureNetIntro.jsx` if it makes the component unnecessarily large.
+
+15. Verify the result specifically against the current screenshot:
+
+* Dot Grid fills the whole viewport.
+* Dots are visible behind the SecureNet content.
+* Text does NOT disappear into the dots.
+* Buttons remain clickable.
+* Voice control remains clickable.
+* No extra panel is created.
+* No fake radar effect appears.
+* Existing intro spacing/layout remains intact.
+* Existing Home/GridDistortion behavior is untouched.
+
+Before editing, inspect the existing intro component and CSS and determine which element is currently responsible for the full-screen background and stacking context.
+
+Make the smallest clean change necessary.
+
+```
+
+One extra thing: **don't install `@gsap/react` just for this unless the actual DotGrid implementation requires it**. The basic GSAP package is sufficient for GSAP animations, and the official GSAP docs use `npm install gsap`. :contentReference[oaicite:2]{index=2}
+```
+
+[1]: https://shadcnregistry.com/react-bits/dotgrid-ts-css?utm_source=chatgpt.com "DotGrid – shadcn/ui Component by react-bits"

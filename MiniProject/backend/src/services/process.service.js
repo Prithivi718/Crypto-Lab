@@ -274,3 +274,5 @@ export const process_run = async (message, metadata = {}) => {
         };
     }
 };
+
+process_run("GPT THx a LOT dude")

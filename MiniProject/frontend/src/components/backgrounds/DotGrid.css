@@ -1,0 +1,14 @@
+/* DotGrid.css
+ * Positions the canvas as a full-bleed background layer.
+ * pointer-events: none ensures it never intercepts button clicks.
+ */
+
+.dot-grid-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    display: block;
+}

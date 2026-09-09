@@ -145,6 +145,13 @@
         flex-shrink: 0;
         transform: translate(-16px);
     }
+
+    .brand-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        transform: translate(-16px);
+    }
 }
 
 @media (max-width: 768px) {

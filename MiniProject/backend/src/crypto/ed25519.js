@@ -45,6 +45,12 @@ export const importEd25519PublicKey = async (jwkKey) => {
     return publicKey;
 }
 
+export const exportEd25519PublicKeyHex = async (publicKey) => {
+    const raw = await crypto.subtle.exportKey("raw", publicKey);
+
+    return Buffer.from(raw).toString("hex");
+};
+
 export const signMessage = async (message, privateKey) => {
 
     const messageBuffer = new TextEncoder().encode(message);

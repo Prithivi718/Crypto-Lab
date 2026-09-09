@@ -1,2559 +1,1296 @@
-Absolutely bro. Now that we have the architecture nailed down, here is the **complete implementation prompt** you can give directly to your coding agent.
-
-I’ve made this one strict about responsibilities so it doesn’t “helpfully” mix `process`, `benchmark`, `workflow`, and `report` again.
-
----
-
-# COMPLETE BACKEND IMPLEMENTATION PROMPT — SECURENET EXECUTION, WORKFLOW, BENCHMARK & REPORT ARCHITECTURE
-
-We are implementing the backend architecture for **SecureNet — Secure Defence Communication Network**, a college cryptography demonstration application built with **Node.js + Express**.
-
-The backend already contains:
-
-```text
-src/
-├── crypto/
-├── services/
-├── controllers/
-├── routes/
-├── middleware/
-├── utils/
-├── config/
-├── app.js
-└── server.js
-```
-
-Existing relevant files:
-
-```text
-src/services/
-├── crypto.service.js
-├── workflow.service.js
-├── process.service.js
-├── benchmark.service.js
-└── report.service.js
-
-src/controllers/
-├── processController.js
-├── workflowController.js
-├── analysisController.js
-└── ...
-
-src/utils/
-└── timingUtils.js
-```
-
-The uploaded existing implementation must be treated as the starting point.
-
-The current `processController.js` incorrectly imports and executes `runBenchmarkProcess()` instead of `process_run()`. Fix this architecture completely.
-
-The current `benchmark.service.js` is also incorrectly performing the complete cryptographic pipeline itself. Refactor it so that it becomes an **analysis layer over already-collected execution measurements**, not the cryptographic executor.
-
-The goal is to create one clean execution architecture shared by both Workflow and Process.
-
----
-
-# 1. CORE ARCHITECTURE
-
-Use this architecture:
-
-```text
-                         CRYPTO SERVICE
-                              │
-                  actual cryptographic primitives
-                              │
-             ┌────────────────┴────────────────┐
-             │                                 │
-             ▼                                 ▼
-      WORKFLOW SERVICE                   PROCESS SERVICE
-      step-by-step demo                  complete execution
-             │                                 │
-             └────────────────┬────────────────┘
-                              │
-                              ▼
-                     EXECUTION CONTEXT
-                              │
-               ┌──────────────┼──────────────┐
-               │              │              │
-               ▼              ▼              ▼
-           STEP DATA      TIMINGS        VERIFICATION
-               │              │              │
-               └──────────────┼──────────────┘
-                              ▼
-                     BENCHMARK SERVICE
-                    analysis only
-                              │
-                              ▼
-                      REPORT SERVICE
-                 final report generation
-                              │
-                              ▼
-                       ANALYSIS PAGE
-```
-
-Do not introduce a different architecture.
-
----
-
-# 2. EXACT RESPONSIBILITY OF EACH SERVICE
-
-## `crypto.service.js`
-
-Responsible only for actual cryptographic operations.
-
-Examples:
-
-```text
-generateEdKeys()
-keyExchange()
-deriveSessionKey()
-generateRSAKeys()
-wrapSessionKey()
-encryptMessage()
-createSignedData()
-signEd25519()
-verifyEd25519()
-unwrapSessionKey()
-decryptMessage()
-```
-
-It must not:
-
-* create reports
-* generate benchmark summaries
-* manage HTTP
-* control page navigation
-* render UI
-* generate human-readable final reports
-
-It performs cryptographic work and returns the necessary raw results.
-
----
-
-# 3. `workflow.service.js`
-
-Purpose:
-
-> Provide the user with a deep, step-by-step demonstration of the entire cryptographic pipeline.
-
-Workflow is educational.
-
-It must execute one step at a time and return information needed by the Pipeline UI.
-
-The user can see:
-
-```text
-01 Ed25519
-02 ECDH
-03 HKDF
-04 RSA-OAEP
-05 AES-256-GCM
-06 Packet Signing
-07 Signature Verification
-08 RSA Session Key Recovery
-09 AES-256-GCM Decryption
-```
-
-The workflow service must maintain an execution context throughout the complete workflow.
-
-The workflow service must NOT calculate benchmark summaries.
-
-It may measure each operation's duration using the shared timing utilities so that telemetry can be shown in the Pipeline UI.
-
----
-
-# 4. `process.service.js`
-
-Purpose:
-
-> Execute the complete encryption + decryption + verification process in one call.
-
-This corresponds to the Mission page's:
-
-```text
-RUN ALGORITHM
-```
-
-The Process service must execute the complete flow without requiring the user to manually click through every step.
-
-Conceptually:
-
-```text
-process_run()
-    ↓
-Ed25519
-    ↓
-ECDH
-    ↓
-HKDF
-    ↓
-RSA key generation
-    ↓
-RSA-OAEP wrap
-    ↓
-AES-256-GCM encryption
-    ↓
-packet creation
-    ↓
-Ed25519 signing
-    ↓
-signature verification
-    ↓
-RSA-OAEP unwrap
-    ↓
-AES-256-GCM decryption
-    ↓
-final plaintext verification
-    ↓
-Execution Context completed
-```
-
-The current `process.service.js` already follows this general encryption → decryption → comparison flow and should be refactored rather than replaced unnecessarily.  
-
-Remove any direct test invocation from the bottom of the service such as:
-
-```js
-process_run("...");
-```
-
-A service module must not execute itself merely because it is imported.
-
----
-
-# 5. VERY IMPORTANT: FIX `processController.js`
-
-The current controller imports:
-
-```js
-import { runBenchmarkProcess } from "../services/benchmark.service.js";
-```
-
-and calls it for the process endpoint. This is wrong. 
-
-Change it to:
-
-```js
-import { process_run } from "../services/process.service.js";
-```
-
-Then:
-
-```js
-const result = await process_run(message, metadata);
-```
-
-Do NOT call `runBenchmarkProcess()` from the process controller.
-
-The process controller should only be responsible for HTTP request/response handling.
-
----
-
-# 6. IMPORTANT CONCEPT — EXECUTION CONTEXT
-
-Introduce a reusable concept called:
-
-```text
-Execution Context
-```
-
-This represents:
-
-> Everything belonging to ONE complete SecureNet cryptographic execution.
-
-For example, when the user sends:
-
-```text
-Thanks a lot GPT
-```
-
-create something like:
-
-```js
-{
-    executionId: "exec-...",
-    input: {
-        message: "Thanks a lot GPT",
-        filename: "mission.txt",
-        size: 15
-    },
-
-    workflow: {
-        steps: []
-    },
-
-    process: {
-        encryption: {},
-        decryption: {}
-    },
-
-    cryptographicMaterial: {
-        ed25519: {},
-        ecdh: {},
-        hkdf: {},
-        rsa: {},
-        aes: {},
-        signature: {}
-    },
-
-    measurements: {
-        times: {},
-        sizes: {}
-    },
-
-    verification: {
-        sharedSecretsMatch: false,
-        signatureValid: false,
-        decryptionSuccess: false,
-        plaintextMatch: false
-    },
-
-    benchmark: null,
-
-    report: null,
-
-    status: "running",
-
-    createdAt: "...",
-    completedAt: null
-}
-```
-
-This becomes the **single source of truth for one execution**.
-
----
-
-# 7. EXECUTION CONTEXT LIFECYCLE
-
-When a user starts an execution:
-
-```text
-createExecutionContext()
-```
-
-The context receives a unique `executionId`.
-
-Example:
-
-```text
-exec-1728439201
-```
-
-Then Workflow or Process modifies that same execution context during execution.
-
-Do not create a separate context for every cryptographic operation.
-
-For:
-
-```text
-"Thanks a lot GPT"
-```
-
-there must be one execution context covering:
-
-```text
-Ed25519 → ECDH → HKDF → RSA → AES → Sign → Verify → Unwrap → Decrypt
-```
-
-Encryption and decryption belong to the same execution.
-
----
-
-# 8. STORAGE FOR THE EXECUTION CONTEXT
-
-For the current college demonstration, use an in-memory store.
-
-Create something such as:
-
-```text
-src/services/executionStore.js
-```
-
-using:
-
-```js
-const executions = new Map();
-```
-
-Expose functions such as:
-
-```js
-createExecution()
-getExecution(executionId)
-updateExecution(executionId, patch)
-deleteExecution(executionId)
-```
-
-Do not use random local variables across services as the only storage mechanism.
-
-Both Workflow and Process need access to the same execution context.
-
-Design this as a replaceable storage layer so that a database can be added later without rewriting the service architecture.
-
----
-
-# 9. WORKFLOW EXECUTION
-
-Workflow should create or receive an execution context.
-
-Example:
-
-```text
-POST /api/workflow/start
-```
-
-Request:
-
-```json
-{
-    "message": "Thanks a lot GPT",
-    "filename": "mission.txt",
-    "fileSize": 15
-}
-```
-
-Response:
-
-```json
-{
-    "success": true,
-    "workflowId": "workflow-...",
-    "executionId": "exec-..."
-}
-```
-
-The workflow then performs one step at a time.
-
----
-
-# 10. WORKFLOW STEP DATA
-
-Keep the existing 9-step structure but enrich the responses.
-
-The existing uploaded `response.json` shows the current step response structure and the current limitations. For example, Step 1 currently returns only conceptual key-format/readiness information, while Step 2 only returns `sharedSecretsMatch`. 
-
-Modify them as follows.
-
----
-
-# 11. STEP 1 — ED25519
-
-Purpose:
-
-Generate the sender's Ed25519 signing identity.
-
-Frontend response:
-
-```json
-{
-    "step": 1,
-    "phase": "encryption",
-    "status": "completed",
-    "title": "Ed25519 Authentication",
-    "description": "Sender generating Ed25519 key pair for digital signature.",
-    "algorithm": "Ed25519",
-    "details": {
-        "publicKey": "7a3f********",
-        "publicKeyFormat": "JWK",
-        "keyReady": true
-    }
-}
-```
-
-Requirements:
-
-* output the public key
-* do NOT return the private key in the normal workflow response
-* store the actual private/public key internally in the Execution Context
-* use the masking utility for the displayed public key
-
----
-
-# 12. STEP 2 — ECDH
-
-Purpose:
-
-Generate both endpoint key pairs and establish a shared secret.
-
-Response:
-
-```json
-{
-    "step": 2,
-    "phase": "encryption",
-    "status": "completed",
-    "title": "ECDH Key Exchange",
-    "description": "Both bases generate keys and independently calculate the same shared secret.",
-    "algorithm": "ECDH",
-    "details": {
-        "baseAPublicKey": "04ab********",
-        "baseBPublicKey": "04f1********",
-        "sharedSecret": "98cd********",
-        "sharedSecretsMatch": true
-    }
-}
-```
-
-Internally retain:
-
-```text
-Base A private key
-Base A public key
-Base B private key
-Base B public key
-Shared secret A
-Shared secret B
-```
-
-Do not expose both private ECDH keys in the normal workflow API response.
-
----
-
-# 13. STEP 3 — HKDF
-
-Purpose:
-
-Derive the AES-256 session key.
-
-Response:
-
-```json
-{
-    "step": 3,
-    "phase": "encryption",
-    "status": "completed",
-    "title": "HKDF Key Derivation",
-    "description": "Deriving 256-bit AES session key from the ECDH shared secret.",
-    "algorithm": "HKDF",
-    "details": {
-        "salt": "9e41********",
-        "hkdfInfo": "7365********",
-        "sessionKey": "bc72********",
-        "sessionKeyLength": 32
-    }
-}
-```
-
-Store internally:
-
-```text
-ECDH shared secret
-salt
-HKDF info
-session key
-```
-
-Mask sensitive values in the response.
-
----
-
-# 14. STEP 4 — RSA-OAEP
-
-Purpose:
-
-Protect the AES session key by wrapping it using the RSA public key.
-
-Response:
-
-```json
-{
-    "step": 4,
-    "phase": "encryption",
-    "status": "completed",
-    "title": "RSA-OAEP Key Protection",
-    "description": "Wrapping AES session key with RSA public key.",
-    "algorithm": "RSA-OAEP",
-    "details": {
-        "publicKey": "MIIB********",
-        "wrappedSessionKey": "8fd2********",
-        "wrappedKeyLength": 256
-    }
-}
-```
-
-Store internally:
-
-```text
-RSA public key
-RSA private key
-wrapped session key
-```
-
-Do not return RSA private key in the normal workflow response.
-
----
-
-# 15. STEP 5 — AES-256-GCM
-
-Purpose:
-
-Encrypt the original plaintext.
-
-For example:
-
-```text
-Thanks a lot GPT
-```
-
-Response:
-
-```json
-{
-    "step": 5,
-    "phase": "encryption",
-    "status": "completed",
-    "title": "AES-256-GCM Message Encryption",
-    "description": "Message encrypted using AES-256 session key.",
-    "algorithm": "AES-256-GCM",
-    "details": {
-        "ciphertextHex": "d06d********",
-        "ivHex": "fd44********",
-        "authTagHex": "dbecc32b********",
-        "ciphertextLength": 15,
-        "ivLength": 12,
-        "authTagLength": 16
-    }
-}
-```
-
-The actual values remain in the Execution Context.
-
-Do not use `"..."` as the masking representation.
-
-Use:
-
-```text
-first N characters + ********
-```
-
----
-
-# 16. STEP 6 — PACKET SIGNING
-
-Response:
-
-```json
-{
-    "step": 6,
-    "phase": "encryption",
-    "status": "completed",
-    "title": "Packet Signing",
-    "description": "Creating secure packet and signing with Ed25519.",
-    "algorithm": "Ed25519",
-    "details": {
-        "signature": "a71f********",
-        "signatureLength": 64
-    }
-}
-```
-
-Store the complete signature internally.
-
-Do not return only its length.
-
----
-
-# 17. STEP 7 — SIGNATURE VERIFICATION
-
-No additional confidential information needed.
-
-Response:
-
-```json
-{
-    "step": 7,
-    "phase": "decryption",
-    "status": "completed",
-    "title": "Signature Verification",
-    "description": "Receiver verifies Ed25519 signature.",
-    "algorithm": "Ed25519",
-    "details": {
-        "valid": true
-    }
-}
-```
-
----
-
-# 18. STEP 8 — RSA SESSION KEY RECOVERY
-
-Response:
-
-```json
-{
-    "step": 8,
-    "phase": "decryption",
-    "status": "completed",
-    "title": "RSA Session Key Recovery",
-    "description": "Receiver recovers AES session key using RSA private key.",
-    "algorithm": "RSA-OAEP",
-    "details": {
-        "recoveredSessionKey": "bc72********",
-        "recoveredKeyLength": 32
-    }
-}
-```
-
-Store the complete recovered session key internally.
-
-Also store whether:
-
-```text
-original session key === recovered session key
-```
-
----
-
-# 19. STEP 9 — AES-256-GCM DECRYPTION
-
-Response:
-
-```json
-{
-    "step": 9,
-    "phase": "decryption",
-    "status": "completed",
-    "title": "AES-256-GCM Decryption",
-    "description": "Decrypting ciphertext and verifying auth tag.",
-    "algorithm": "AES-256-GCM",
-    "details": {
-        "sessionKey": "bc72********",
-        "plaintext": "Thanks a lot GPT"
-    }
-}
-```
-
-The plaintext should remain fully visible because it is the actual demonstrated message.
-
-Store:
-
-```text
-recovered session key
-plaintext
-authentication result
-```
-
-internally.
-
----
-
-# 20. SENSITIVE-DATA MASKING UTILITY
-
-Create:
-
-```text
-src/utils/maskSensitive.js
-```
-
-Provide:
-
-```js
-maskSensitive(value, options)
-```
-
-Default behavior:
-
-```text
-visible characters = 4
-mask character = *
-```
-
-Example:
-
-```text
-abcdef1234567890
-```
-
-becomes:
-
-```text
-abcd********
-```
-
-Do not use:
-
-```text
-abcd...
-```
-
-The mask must use literal `*` characters.
-
-The utility should work with:
-
-* strings
-* Buffer
-* Uint8Array
-* ArrayBuffer
-* serialized cryptographic values
-
-Normalize the input safely before masking.
-
-Do not alter the actual stored value.
-
-The utility should make it possible to obtain:
-
-```js
-{
-    raw: originalValue,
-    display: maskedValue
-}
-```
-
-where appropriate internally.
-
----
-
-# 21. FULL VS DISPLAY DATA
-
-Maintain the distinction:
-
-```text
-RAW EXECUTION DATA
-        ↓
-maskSensitive()
-        ↓
-DISPLAY DATA
-```
-
-The Execution Context contains the actual execution values.
-
-The normal Workflow API response contains masked values.
-
-The final report generation layer can decide which representation belongs in the exported demonstration report.
-
-Important:
-
-These cryptographic values are for the educational demonstration only. Never treat the generated private keys or session keys as production secrets or real operational credentials.
-
----
-
-# 22. TIMING ARCHITECTURE
-
-Use the existing:
-
-```js
-measureSync()
-measureAsync()
-```
-
-from:
-
-```text
-src/utils/timingUtils.js
-```
-
-The current benchmark service already demonstrates timing individual operations using these helpers.  
-
-Keep timing at the utility/measurement level.
-
-Do NOT make `benchmark.service.js` the stopwatch.
-
-Correct architecture:
-
-```text
-Crypto operation
-       ↓
-timingUtils
-       ↓
-raw measurement
-       ↓
-Execution Context
-       ↓
-benchmark.service
-       ↓
-analysis
-```
-
-Think:
-
-```text
-timingUtils = stopwatch
-benchmark = analyst
-```
-
----
-
-# 23. WHAT SHOULD BE MEASURED
-
-Record timings for:
-
-```text
-ed25519Gen
-ecdhExchange
-hkdfDerivation
-rsaGen
-rsaWrap
-aesEncryption
-ed25519Sign
-ed25519Verify
-rsaUnwrap
-aesDecryption
-```
-
-Also record:
-
-```text
-totalElapsed
-```
-
-Use high-resolution timing.
-
-Do not use `Date.now()` for fine-grained algorithm measurements.
-
-The existing benchmark measurements include these exact operation categories and a total elapsed time. 
-
----
-
-# 24. EXECUTION MEASUREMENTS
-
-Store:
-
-```js
-measurements: {
-    times: {
-        ed25519Gen: 0,
-        ecdhExchange: 0,
-        hkdfDerivation: 0,
-        rsaGen: 0,
-        rsaWrap: 0,
-        aesEncryption: 0,
-        ed25519Sign: 0,
-        ed25519Verify: 0,
-        rsaUnwrap: 0,
-        aesDecryption: 0,
-        totalElapsed: 0
-    },
-
-    sizes: {
-        inputSize: 0,
-        sessionKey: 32,
-        wrappedSessionKey: 0,
-        ciphertext: 0,
-        iv: 12,
-        authTag: 16,
-        signature: 64
-    }
-}
-```
-
-Do not invent values.
-
-Always use actual measured values from the execution.
-
-The existing service already records input size and the relevant cryptographic object sizes. 
-
----
-
-# 25. PIPELINE TELEMETRY
-
-The Pipeline UI should NOT receive the entire benchmark analysis.
-
-It only needs lightweight information such as:
-
-```json
-{
-    "lastOperation": "HKDF",
-    "durationMs": 1.8473,
-    "channel": "HKDF",
-    "integrity": "NOMINAL"
-}
-```
-
-The frontend can render:
-
-```text
-TELEMETRY
-
-1.85 ms
-LAST OPERATION
-
-HKDF
-
-CHANNEL
-ACTIVE
-
-INTEGRITY
-NOMINAL
-```
-
-The Pipeline UI should not show:
-
-```text
-average
-min
-max
-throughput
-benchmark comparison
-```
-
-Those belong to the final Analysis/Report page.
-
----
-
-# 26. BENCHMARK SERVICE — MAJOR REFACTOR
-
-Current `benchmark.service.js` is doing the wrong thing.
-
-It currently:
-
-* generates crypto keys
-* performs encryption
-* performs decryption
-* measures operations
-* verifies signatures
-* creates a report
-* writes a report file
-
-This entire pipeline currently exists inside the benchmark service.   
-
-Refactor it.
-
-Benchmark should NOT:
-
-```text
-generate keys
-encrypt
-decrypt
-rerun crypto
-```
-
-Benchmark should receive an already completed Execution Context.
-
----
-
-# 27. BENCHMARK SERVICE NEW RESPONSIBILITY
-
-Implement something like:
-
-```js
-analyzeExecution(executionContext)
-```
-
-Input:
-
-```js
-{
-    executionId,
-    measurements,
-    verification,
-    input,
-    cryptographicMaterial,
-    process,
-    workflow
-}
-```
-
-Output:
-
-```js
-{
-    executionId,
-
-    timing: {
-        ...
-    },
-
-    totalExecutionTime: ...,
-
-    sizes: {
-        ...
-    },
-
-    verification: {
-        ...
-    },
-
-    analysis: {
-        fastestOperation: "...",
-        slowestOperation: "...",
-        encryptionTime: ...,
-        decryptionTime: ...
-    }
-}
-```
-
-Benchmark is analysis only.
-
----
-
-# 28. BENCHMARK MUST NOT HAVE ITS OWN HTTP ROUTE
-
-Do NOT expose:
-
-```text
-POST /api/benchmark/run
-```
-
-for this architecture.
-
-Benchmark is an internal service.
-
-It is invoked by:
-
-```text
-report.service.js
-```
-
-after the execution is complete.
-
-There is no separate frontend Benchmark page.
-
----
-
-# 29. IMPORTANT: REPORT GENERATION DOES NOT RERUN CRYPTO
-
-Never do:
-
-```text
-report service
-    ↓
-benchmark
-    ↓
-rerun encryption
-    ↓
-rerun decryption
-```
-
-Instead:
-
-```text
-actual execution
-      ↓
-execution context
-      ↓
-report service
-      ↓
-benchmark analyzes stored measurements
-      ↓
-final report
-```
-
-The final report must describe **the actual execution that occurred**, not another newly-generated execution.
-
----
-
-# 30. REPORT SERVICE
-
-`report.service.js` is the central aggregation layer.
-
-Its responsibility:
-
-> Take the completed Execution Context, obtain benchmark analysis, and produce a complete human-readable analysis structure.
-
-Report Service should combine:
-
-```text
-Execution Context
-+
-Workflow step information
-+
-Process execution information
-+
-Cryptographic material
-+
-Encrypted packet
-+
-Decryption result
-+
-Verification
-+
-Benchmark analysis
-```
-
----
-
-# 31. REPORT SERVICE FLOW
-
-Implement something like:
-
-```js
-generateReport(executionId)
-```
-
-Flow:
-
-```text
-GET /api/report/:executionId
-        ↓
-reportController
-        ↓
-report.service
-        ↓
-getExecution(executionId)
-        ↓
-validate execution
-        ↓
-benchmarkService.analyzeExecution(execution)
-        ↓
-build report
-        ↓
-return report
-```
-
-Do not perform crypto again.
-
----
-
-# 32. REPORT STRUCTURE
-
-The final report should have:
-
-```text
-SUMMARY
-INPUT
-ENCRYPTION
-DECRYPTION
-CRYPTOGRAPHIC MATERIAL
-PACKET
-VERIFICATION
-PERFORMANCE
-FINAL RESULT
-```
-
-Recommended structure:
-
-```js
-{
-    summary: {
-        executionId,
-        filename,
-        inputSize,
-        status,
-        createdAt,
-        completedAt
-    },
-
-    input: {
-        plaintext,
-        filename,
-        size
-    },
-
-    encryption: [
-        {
-            step: 1,
-            algorithm: "Ed25519",
-            title: "...",
-            input: {...},
-            process: {...},
-            output: {...},
-            status: "passed"
+import PDFDocument from 'pdfkit';
+
+/**
+ * Generate a properly paginated, professionally formatted SecureNet PDF.
+ *
+ * Design goals:
+ * - No overlapping text or boxes
+ * - Automatic page breaks
+ * - Long plaintext/ciphertext wraps safely
+ * - Consistent SecureNet olive palette
+ * - Clear section hierarchy
+ * - Dynamic-height cards
+ * - Avoids [object CryptoKey] / [object ArrayBuffer] where possible
+ */
+export const generateReportPDF = (executionId) => {
+    const data = generateReportData(executionId);
+
+    return new Promise((resolve, reject) => {
+        try {
+            const doc = new PDFDocument({
+                size: 'A4',
+                margins: {
+                    top: 55,
+                    bottom: 55,
+                    left: 48,
+                    right: 48,
+                },
+                info: {
+                    Title: 'SecureNet Cryptographic Execution Report',
+                    Author: 'SecureNet Defence Communication Network',
+                    Subject: 'Cryptographic Execution and Verification Report',
+                },
+                bufferPages: true,
+            });
+
+            const buffers = [];
+
+            doc.on('data', (chunk) => buffers.push(chunk));
+            doc.on('end', () => resolve(Buffer.concat(buffers)));
+            doc.on('error', reject);
+
+            /* ============================================================
+             * SECURENET COLOR PALETTE
+             * ============================================================
+             */
+
+            const C = {
+                // Main brand / tactical colors
+                oliveDark: '#2B310A',
+                olive: '#4B5320',
+                oliveMid: '#6A7337',
+                oliveSoft: '#929A68',
+
+                // Page
+                paper: '#F5F4EE',
+                paperAlt: '#ECEBE2',
+
+                // Text
+                text: '#25291B',
+                textSoft: '#4E5341',
+                muted: '#727766',
+
+                // Borders
+                border: '#C5C8B5',
+                borderDark: '#92977D',
+
+                // Status
+                success: '#4F6F32',
+                successBg: '#EAF0E1',
+                danger: '#9B433A',
+                dangerBg: '#F5E7E5',
+
+                // Code / cryptographic values
+                codeBg: '#EEF0E8',
+                codeText: '#34401D',
+
+                white: '#FFFFFF',
+            };
+
+            const PAGE = {
+                width: doc.page.width,
+                height: doc.page.height,
+                left: doc.page.margins.left,
+                right: doc.page.width - doc.page.margins.right,
+                top: doc.page.margins.top,
+                bottom: doc.page.height - doc.page.margins.bottom,
+                contentWidth:
+                    doc.page.width -
+                    doc.page.margins.left -
+                    doc.page.margins.right,
+            };
+
+            /* ============================================================
+             * FONT HELPERS
+             * ============================================================
+             */
+
+            const setBody = () => {
+                doc.font('Helvetica').fontSize(9).fillColor(C.text);
+            };
+
+            const setMono = () => {
+                doc.font('Courier').fontSize(7.5).fillColor(C.codeText);
+            };
+
+            /* ============================================================
+             * PAGE HEADER / FOOTER
+             * ============================================================
+             */
+
+            const drawPageChrome = (pageNumber) => {
+                // Header rule
+                doc
+                    .moveTo(PAGE.left, 32)
+                    .lineTo(PAGE.right, 32)
+                    .lineWidth(1)
+                    .strokeColor(C.olive)
+                    .stroke();
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(7)
+                    .fillColor(C.olive)
+                    .text(
+                        'SECURENET DEFENCE COMMUNICATION NETWORK',
+                        PAGE.left,
+                        18,
+                        {
+                            width: PAGE.contentWidth,
+                            align: 'left',
+                        }
+                    );
+
+                doc
+                    .font('Helvetica')
+                    .fontSize(7)
+                    .fillColor(C.muted)
+                    .text(
+                        `EXECUTION REPORT  /  ${executionId}`,
+                        PAGE.left,
+                        18,
+                        {
+                            width: PAGE.contentWidth,
+                            align: 'right',
+                        }
+                    );
+
+                // Footer
+                doc
+                    .moveTo(PAGE.left, PAGE.height - 32)
+                    .lineTo(PAGE.right, PAGE.height - 32)
+                    .lineWidth(0.75)
+                    .strokeColor(C.border)
+                    .stroke();
+
+                doc
+                    .font('Helvetica')
+                    .fontSize(7)
+                    .fillColor(C.muted)
+                    .text(
+                        'SECURENET  |  CRYPTOGRAPHIC EXECUTION & VERIFICATION',
+                        PAGE.left,
+                        PAGE.height - 23,
+                        {
+                            width: PAGE.contentWidth / 2,
+                            align: 'left',
+                        }
+                    );
+
+                doc
+                    .text(
+                        `PAGE ${pageNumber}`,
+                        PAGE.right - 80,
+                        PAGE.height - 23,
+                        {
+                            width: 80,
+                            align: 'right',
+                        }
+                    );
+            };
+
+            let currentPage = 1;
+
+            drawPageChrome(currentPage);
+
+            /* ============================================================
+             * PAGE MANAGEMENT
+             * ============================================================
+             */
+
+            const newPage = () => {
+                doc.addPage();
+                currentPage += 1;
+                drawPageChrome(currentPage);
+                doc.y = PAGE.top;
+            };
+
+            const ensureSpace = (heightNeeded) => {
+                const remaining = PAGE.bottom - doc.y;
+
+                if (remaining < heightNeeded) {
+                    newPage();
+                    return true;
+                }
+
+                return false;
+            };
+
+            /* ============================================================
+             * GENERAL TEXT UTILITIES
+             * ============================================================
+             */
+
+            const normalizeValue = (value) => {
+                if (value === null || value === undefined) {
+                    return 'N/A';
+                }
+
+                // Prevent ugly JS object representations
+                if (value instanceof Uint8Array) {
+                    return Buffer.from(value).toString('hex');
+                }
+
+                if (typeof value === 'object') {
+                    if (
+                        value.constructor?.name === 'CryptoKey' ||
+                        String(value) === '[object CryptoKey]'
+                    ) {
+                        return '[CRYPTOGRAPHIC KEY OBJECT]';
+                    }
+
+                    if (
+                        value.constructor?.name === 'ArrayBuffer' ||
+                        String(value) === '[object ArrayBuffer]'
+                    ) {
+                        try {
+                            return Buffer.from(value).toString('hex');
+                        } catch {
+                            return '[BINARY DATA]';
+                        }
+                    }
+
+                    try {
+                        return JSON.stringify(value, null, 2);
+                    } catch {
+                        return String(value);
+                    }
+                }
+
+                return String(value);
+            };
+
+            const safeText = (value) =>
+                normalizeValue(value)
+                    .replace(/\r\n/g, '\n')
+                    .replace(/\r/g, '\n');
+
+            const drawSectionTitle = (number, title, subtitle = null) => {
+                ensureSpace(subtitle ? 55 : 40);
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(13)
+                    .fillColor(C.olive)
+                    .text(`${number}. ${title.toUpperCase()}`, PAGE.left);
+
+                doc
+                    .moveTo(PAGE.left, doc.y + 5)
+                    .lineTo(PAGE.right, doc.y + 5)
+                    .lineWidth(1)
+                    .strokeColor(C.borderDark)
+                    .stroke();
+
+                doc.moveDown(0.55);
+
+                if (subtitle) {
+                    doc
+                        .font('Helvetica')
+                        .fontSize(8.5)
+                        .fillColor(C.muted)
+                        .text(subtitle, PAGE.left, doc.y, {
+                            width: PAGE.contentWidth,
+                        });
+
+                    doc.moveDown(0.55);
+                }
+            };
+
+            const drawSmallLabel = (label, x, y, width) => {
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(7)
+                    .fillColor(C.oliveMid)
+                    .text(label.toUpperCase(), x, y, {
+                        width,
+                    });
+            };
+
+            /* ============================================================
+             * DYNAMIC CARD
+             * ============================================================
+             */
+
+            const drawDynamicCard = ({
+                x = PAGE.left,
+                width = PAGE.contentWidth,
+                padding = 12,
+                background = C.paperAlt,
+                border = C.border,
+                radius = 3,
+                render,
+                estimatedHeight = 50,
+            }) => {
+                /*
+                 * We render the contents once into the real document position.
+                 * PDFKit manages text wrapping and page breaking naturally.
+                 *
+                 * Card height is calculated using a local cursor, then the
+                 * background is redrawn behind the final region.
+                 *
+                 * For very long content, use drawLongTextBlock instead.
+                 */
+
+                const startY = doc.y;
+
+                ensureSpace(estimatedHeight);
+
+                const contentStartY = doc.y + padding;
+
+                // Draw a conservative temporary background.
+                doc
+                    .roundedRect(
+                        x,
+                        startY,
+                        width,
+                        estimatedHeight,
+                        radius
+                    )
+                    .fillAndStroke(background, border);
+
+                doc.y = contentStartY;
+
+                render({
+                    x: x + padding,
+                    y: doc.y,
+                    width: width - padding * 2,
+                });
+
+                const finalY = Math.max(doc.y + padding, startY + estimatedHeight);
+
+                // Since PDFKit cannot move an existing rectangle after the
+                // content has been rendered, redraw the border only when the
+                // content stayed within the estimated region.
+                //
+                // Long variable sections should use drawLongTextBlock.
+                doc.y = finalY + 6;
+
+                return finalY;
+            };
+
+            /* ============================================================
+             * LONG TEXT BLOCK
+             *
+             * Important: this is what fixes the plaintext/ciphertext problem.
+             * Never force a fixed 45px box around arbitrary-size text.
+             * ============================================================
+             */
+
+            const drawLongTextBlock = ({
+                label,
+                value,
+                mono = false,
+                fontSize = 7.5,
+                background = C.codeBg,
+                border = C.border,
+            }) => {
+                const text = safeText(value);
+
+                // Label
+                ensureSpace(35);
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(7.5)
+                    .fillColor(C.textSoft)
+                    .text(label, PAGE.left, doc.y);
+
+                doc.moveDown(0.25);
+
+                /*
+                 * Calculate the wrapped height for the current page width.
+                 * This is the critical difference from the original code.
+                 */
+                const textWidth = PAGE.contentWidth - 20;
+
+                doc.font(mono ? 'Courier' : 'Helvetica').fontSize(fontSize);
+
+                const height = doc.heightOfString(text, {
+                    width: textWidth,
+                    lineGap: 1.5,
+                    paragraphGap: 2,
+                });
+
+                /*
+                 * If it does not fit on the current page and isn't gigantic,
+                 * start a new page first.
+                 */
+                const available = PAGE.bottom - doc.y;
+
+                if (height + 30 > available && height < PAGE.height * 0.8) {
+                    newPage();
+                }
+
+                const boxTop = doc.y;
+                const boxHeight = Math.min(
+                    Math.max(height + 18, 35),
+                    PAGE.bottom - boxTop
+                );
+
+                doc
+                    .rect(PAGE.left, boxTop, PAGE.contentWidth, boxHeight)
+                    .fillAndStroke(background, border);
+
+                doc
+                    .font(mono ? 'Courier' : 'Helvetica')
+                    .fontSize(fontSize)
+                    .fillColor(mono ? C.codeText : C.text)
+                    .text(text, PAGE.left + 10, boxTop + 9, {
+                        width: textWidth,
+                        lineGap: 1.5,
+                        paragraphGap: 2,
+                    });
+
+                doc.y = Math.max(
+                    doc.y + 3,
+                    boxTop + boxHeight + 8
+                );
+            };
+
+            /* ============================================================
+             * KEY-VALUE ROW
+             * ============================================================
+             */
+
+            const drawKeyValue = ({
+                label,
+                value,
+                x = PAGE.left,
+                width = PAGE.contentWidth,
+                mono = false,
+            }) => {
+                const text = safeText(value);
+
+                const labelWidth = 145;
+                const valueWidth = width - labelWidth - 10;
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(8)
+                    .fillColor(C.textSoft)
+                    .text(label, x, doc.y, {
+                        width: labelWidth,
+                    });
+
+                doc
+                    .font(mono ? 'Courier' : 'Helvetica')
+                    .fontSize(mono ? 7 : 8)
+                    .fillColor(C.text)
+                    .text(text, x + labelWidth, doc.y, {
+                        width: valueWidth,
+                        lineGap: 1,
+                    });
+
+                doc.moveDown(0.35);
+            };
+
+            /* ============================================================
+             * STATUS BADGE
+             * ============================================================
+             */
+
+            const drawStatusBadge = (label, passed) => {
+                const text = passed ? 'PASSED' : 'FAILED';
+                const bg = passed ? C.successBg : C.dangerBg;
+                const color = passed ? C.success : C.danger;
+
+                const width = 65;
+                const height = 18;
+
+                doc
+                    .roundedRect(
+                        PAGE.right - width,
+                        doc.y - 1,
+                        width,
+                        height,
+                        3
+                    )
+                    .fill(bg)
+                    .strokeColor(color)
+                    .stroke();
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(7)
+                    .fillColor(color)
+                    .text(text, PAGE.right - width, doc.y + 5, {
+                        width,
+                        align: 'center',
+                    });
+            };
+
+            /* ============================================================
+             * TITLE / EXECUTIVE HEADER
+             * ============================================================
+             */
+
+            doc
+                .rect(0, 0, PAGE.width, 105)
+                .fill(C.oliveDark);
+
+            doc
+                .font('Helvetica-Bold')
+                .fontSize(16)
+                .fillColor(C.white)
+                .text(
+                    'SECURENET DEFENCE COMMUNICATION NETWORK',
+                    PAGE.left,
+                    25,
+                    {
+                        width: PAGE.contentWidth,
+                    }
+                );
+
+            doc
+                .font('Helvetica')
+                .fontSize(9)
+                .fillColor('#D9DDC9')
+                .text(
+                    'CRYPTOGRAPHIC EXECUTION & VERIFICATION REPORT',
+                    PAGE.left,
+                    50,
+                    {
+                        width: PAGE.contentWidth,
+                    }
+                );
+
+            doc
+                .font('Courier')
+                .fontSize(7.5)
+                .fillColor(C.oliveSoft)
+                .text(
+                    `EXECUTION ID // ${executionId}`,
+                    PAGE.left,
+                    75
+                );
+
+            doc.y = 125;
+
+            /* ============================================================
+             * 1. EXECUTIVE SUMMARY
+             * ============================================================
+             */
+
+            drawSectionTitle(
+                1,
+                'Executive Summary',
+                'High-level execution, verification, and performance information.'
+            );
+
+            ensureSpace(110);
+
+            const summaryTop = doc.y;
+            const summaryHeight = 105;
+
+            doc
+                .roundedRect(
+                    PAGE.left,
+                    summaryTop,
+                    PAGE.contentWidth,
+                    summaryHeight,
+                    4
+                )
+                .fillAndStroke(C.paperAlt, C.border);
+
+            const col1 = PAGE.left + 14;
+            const col2 = PAGE.left + PAGE.contentWidth / 2 + 10;
+
+            const rowY = [
+                summaryTop + 14,
+                summaryTop + 34,
+                summaryTop + 54,
+                summaryTop + 74,
+            ];
+
+            doc.font('Helvetica-Bold').fontSize(7.5);
+
+            // Left
+            drawSmallLabel('Execution ID', col1, rowY[0], 180);
+            doc
+                .font('Courier')
+                .fontSize(7)
+                .fillColor(C.text)
+                .text(data.summary.executionId, col1, rowY[0] + 9, {
+                    width: 190,
+                });
+
+            drawSmallLabel('Filename', col1, rowY[1], 180);
+            doc
+                .font('Helvetica')
+                .fontSize(8)
+                .fillColor(C.text)
+                .text(
+                    `${data.summary.filename} (${data.summary.inputSize} bytes)`,
+                    col1,
+                    rowY[1] + 9,
+                    {
+                        width: 190,
+                    }
+                );
+
+            drawSmallLabel('Created At', col1, rowY[2], 180);
+            doc
+                .font('Courier')
+                .fontSize(7)
+                .fillColor(C.text)
+                .text(data.summary.createdAt, col1, rowY[2] + 9, {
+                    width: 190,
+                });
+
+            drawSmallLabel('Completed At', col1, rowY[3], 180);
+            doc
+                .font('Courier')
+                .fontSize(7)
+                .fillColor(C.text)
+                .text(data.summary.completedAt || 'N/A', col1, rowY[3] + 9, {
+                    width: 190,
+                });
+
+            // Right
+            drawSmallLabel('Status', col2, rowY[0], 180);
+            doc
+                .font('Helvetica-Bold')
+                .fontSize(8)
+                .fillColor(C.text)
+                .text(
+                    String(data.summary.status || 'UNKNOWN').toUpperCase(),
+                    col2,
+                    rowY[0] + 9,
+                    {
+                        width: 180,
+                    }
+                );
+
+            drawSmallLabel('Verification', col2, rowY[1], 180);
+            doc
+                .font('Helvetica-Bold')
+                .fontSize(8)
+                .fillColor(C.olive)
+                .text(
+                    data.verification.finalStatus || 'N/A',
+                    col2,
+                    rowY[1] + 9,
+                    {
+                        width: 180,
+                    }
+                );
+
+            drawSmallLabel('Total Pipeline Time', col2, rowY[2], 180);
+            doc
+                .font('Courier')
+                .fontSize(7)
+                .fillColor(C.text)
+                .text(
+                    `${data.benchmark?.timing?.totalElapsedMs ?? 'N/A'} ms`,
+                    col2,
+                    rowY[2] + 9,
+                    {
+                        width: 180,
+                    }
+                );
+
+            drawSmallLabel('Throughput', col2, rowY[3], 180);
+            doc
+                .font('Courier')
+                .fontSize(7)
+                .fillColor(C.text)
+                .text(
+                    `${data.benchmark?.analysis?.throughputKBps ?? 'N/A'} KB/s`,
+                    col2,
+                    rowY[3] + 9,
+                    {
+                        width: 180,
+                    }
+                );
+
+            doc.y = summaryTop + summaryHeight + 18;
+
+            /* ============================================================
+             * 2. MISSION INPUT
+             * ============================================================
+             */
+
+            drawSectionTitle(
+                2,
+                'Mission Input Plaintext',
+                'Original plaintext supplied to the cryptographic pipeline.'
+            );
+
+            drawLongTextBlock({
+                label: 'PLAINTEXT',
+                value: data.input.plaintext,
+                mono: true,
+                fontSize: 7.5,
+            });
+
+            /* ============================================================
+             * 3. PIPELINE
+             * ============================================================
+             */
+
+            drawSectionTitle(
+                3,
+                'Step-by-Step Cryptographic Pipeline',
+                'Nine-stage execution trace from authentication through verified decryption.'
+            );
+
+            data.steps.forEach((step) => {
+                /*
+                 * Reserve enough space for the STEP header.
+                 * The detailed output is allowed to span pages naturally.
+                 */
+                ensureSpace(55);
+
+                const headerY = doc.y;
+
+                doc
+                    .roundedRect(
+                        PAGE.left,
+                        headerY,
+                        PAGE.contentWidth,
+                        23,
+                        3
+                    )
+                    .fill(C.oliveDark);
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(8.5)
+                    .fillColor(C.white)
+                    .text(
+                        `STEP ${step.step}  /  ${step.title}`,
+                        PAGE.left + 9,
+                        headerY + 7,
+                        {
+                            width: PAGE.contentWidth * 0.65,
+                        }
+                    );
+
+                doc
+                    .font('Courier')
+                    .fontSize(7)
+                    .fillColor(C.oliveSoft)
+                    .text(
+                        `${step.algorithm}  |  ${step.durationMs} ms`,
+                        PAGE.left + PAGE.contentWidth * 0.65,
+                        headerY + 7,
+                        {
+                            width: PAGE.contentWidth * 0.32,
+                            align: 'right',
+                        }
+                    );
+
+                doc.y = headerY + 31;
+
+                // Description
+                doc
+                    .font('Helvetica')
+                    .fontSize(8)
+                    .fillColor(C.textSoft)
+                    .text(`Description: ${safeText(step.description)}`, {
+                        width: PAGE.contentWidth,
+                        lineGap: 1.5,
+                    });
+
+                doc.moveDown(0.45);
+
+                drawSmallLabel(
+                    'Outputs',
+                    PAGE.left,
+                    doc.y,
+                    PAGE.contentWidth
+                );
+
+                doc.moveDown(0.35);
+
+                /*
+                 * IMPORTANT:
+                 * Each output is rendered as an actual wrapped block.
+                 * This prevents giant ciphertext from crossing into
+                 * the next step or heading.
+                 */
+                for (const [key, rawValue] of Object.entries(
+                    step.output || {}
+                )) {
+                    const value = safeText(rawValue);
+
+                    ensureSpace(35);
+
+                    doc
+                        .font('Helvetica-Bold')
+                        .fontSize(7.5)
+                        .fillColor(C.textSoft)
+                        .text(`${key}:`, PAGE.left + 4, doc.y);
+
+                    doc.moveDown(0.15);
+
+                    doc
+                        .font('Courier')
+                        .fontSize(7)
+                        .fillColor(C.codeText);
+
+                    const valueHeight = doc.heightOfString(value, {
+                        width: PAGE.contentWidth - 14,
+                        lineGap: 1.2,
+                    });
+
+                    const available = PAGE.bottom - doc.y;
+
+                    if (
+                        valueHeight + 22 > available &&
+                        valueHeight < PAGE.height * 0.75
+                    ) {
+                        newPage();
+
+                        drawSmallLabel(
+                            `${key} (continued)`,
+                            PAGE.left,
+                            doc.y,
+                            PAGE.contentWidth
+                        );
+
+                        doc.moveDown(0.35);
+                    }
+
+                    // Light code area
+                    const codeTop = doc.y;
+
+                    doc
+                        .rect(
+                            PAGE.left,
+                            codeTop,
+                            PAGE.contentWidth,
+                            Math.max(valueHeight + 12, 24)
+                        )
+                        .fillAndStroke(C.codeBg, C.border);
+
+                    doc
+                        .font('Courier')
+                        .fontSize(7)
+                        .fillColor(C.codeText)
+                        .text(value, PAGE.left + 7, codeTop + 6, {
+                            width: PAGE.contentWidth - 14,
+                            lineGap: 1.2,
+                        });
+
+                    doc.y = Math.max(
+                        doc.y + 5,
+                        codeTop + valueHeight + 14
+                    );
+
+                    doc.moveDown(0.2);
+                }
+
+                // Step separator
+                doc
+                    .moveTo(PAGE.left, doc.y + 2)
+                    .lineTo(PAGE.right, doc.y + 2)
+                    .strokeColor(C.border)
+                    .lineWidth(0.5)
+                    .stroke();
+
+                doc.moveDown(0.7);
+            });
+
+            /* ============================================================
+             * 4. CRYPTOGRAPHIC INVENTORY
+             * ============================================================
+             */
+
+            drawSectionTitle(
+                4,
+                'Cryptographic Material Inventory',
+                'Cryptographic values captured during this execution.'
+            );
+
+            const material = data.cryptographicMaterial;
+
+            const inventory = [
+                [
+                    'Ed25519 Public Key',
+                    material?.ed25519?.edPublicKey,
+                    true,
+                ],
+                [
+                    'Ed25519 Private Key',
+                    material?.ed25519?.edPrivateKey,
+                    true,
+                ],
+                [
+                    'ECDH Base A Public Key',
+                    material?.ecdh?.baseAPublicKey,
+                    true,
+                ],
+                [
+                    'ECDH Base B Public Key',
+                    material?.ecdh?.baseBPublicKey,
+                    true,
+                ],
+                [
+                    'ECDH Shared Secret',
+                    material?.ecdh?.sharedSecret,
+                    true,
+                ],
+                [
+                    'HKDF Salt',
+                    material?.hkdf?.salt,
+                    true,
+                ],
+                [
+                    'HKDF Info',
+                    material?.hkdf?.info,
+                    true,
+                ],
+                [
+                    'HKDF Session Key',
+                    material?.hkdf?.sessionKey,
+                    true,
+                ],
+                [
+                    'RSA Public Key',
+                    material?.rsa?.rsaPublicKey,
+                    true,
+                ],
+                [
+                    'RSA Private Key',
+                    material?.rsa?.rsaPrivateKey,
+                    true,
+                ],
+                [
+                    'RSA Wrapped Session Key',
+                    material?.rsa?.wrappedSessionKey,
+                    true,
+                ],
+                [
+                    'RSA Recovered Session Key',
+                    material?.rsa?.recoveredSessionKey,
+                    true,
+                ],
+                [
+                    'AES Session Key',
+                    material?.aes?.sessionKey,
+                    true,
+                ],
+                [
+                    'AES IV (Nonce)',
+                    material?.aes?.iv,
+                    true,
+                ],
+                [
+                    'AES Auth Tag',
+                    material?.aes?.authTag,
+                    true,
+                ],
+                [
+                    'AES Ciphertext',
+                    material?.aes?.ciphertext,
+                    true,
+                ],
+                [
+                    'Ed25519 Signature',
+                    material?.signature?.signature,
+                    true,
+                ],
+            ];
+
+            inventory.forEach(([label, value, mono]) => {
+                drawLongTextBlock({
+                    label,
+                    value,
+                    mono,
+                    fontSize: 7,
+                });
+            });
+
+            /* ============================================================
+             * 5. VERIFICATION MATRIX
+             * ============================================================
+             */
+
+            drawSectionTitle(
+                5,
+                'Integrity Verification Matrix',
+                'Cryptographic verification results produced by the execution.'
+            );
+
+            ensureSpace(130);
+
+            const verificationTop = doc.y;
+            const verificationRows = [
+                [
+                    'Shared Secrets Match',
+                    data.verification.sharedSecretsMatch,
+                ],
+                [
+                    'Digital Signature Valid',
+                    data.verification.signatureValid,
+                ],
+                [
+                    'AES Decryption Success',
+                    data.verification.decryptionSuccess,
+                ],
+                [
+                    'Plaintext Integrity Match',
+                    data.verification.plaintextMatch,
+                ],
+            ];
+
+            const rowHeight = 30;
+            const cardHeight = verificationRows.length * rowHeight + 26;
+
+            doc
+                .roundedRect(
+                    PAGE.left,
+                    verificationTop,
+                    PAGE.contentWidth,
+                    cardHeight,
+                    4
+                )
+                .fillAndStroke(C.paperAlt, C.border);
+
+            verificationRows.forEach(([label, passed], index) => {
+                const y = verificationTop + 13 + index * rowHeight;
+
+                doc
+                    .font('Helvetica')
+                    .fontSize(8.5)
+                    .fillColor(C.text)
+                    .text(label, PAGE.left + 12, y + 4, {
+                        width: PAGE.contentWidth - 100,
+                    });
+
+                const badgeX = PAGE.right - 78;
+
+                const bg = passed ? C.successBg : C.dangerBg;
+                const color = passed ? C.success : C.danger;
+
+                doc
+                    .roundedRect(badgeX, y, 64, 18, 3)
+                    .fillAndStroke(bg, color);
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(7)
+                    .fillColor(color)
+                    .text(
+                        passed ? 'PASSED' : 'FAILED',
+                        badgeX,
+                        y + 5,
+                        {
+                            width: 64,
+                            align: 'center',
+                        }
+                    );
+            });
+
+            doc.y = verificationTop + cardHeight + 15;
+
+            // Final status row
+            const finalPassed =
+                data.verification.finalStatus === 'TRANSMISSION VERIFIED';
+
+            doc
+                .font('Helvetica-Bold')
+                .fontSize(9)
+                .fillColor(C.text)
+                .text('FINAL STATUS');
+
+            doc.moveDown(0.25);
+
+            doc
+                .font('Helvetica-Bold')
+                .fontSize(11)
+                .fillColor(finalPassed ? C.success : C.danger)
+                .text(data.verification.finalStatus || 'UNKNOWN');
+
+            doc.moveDown(1);
+
+            /* ============================================================
+             * 6. PERFORMANCE
+             * ============================================================
+             */
+
+            drawSectionTitle(
+                6,
+                'Performance Benchmark & Metrics',
+                'Measured duration of individual cryptographic operations and overall pipeline efficiency.'
+            );
+
+            ensureSpace(80);
+
+            const benchOps = data.benchmark?.timing?.operations || {};
+
+            const colOperation = PAGE.left;
+            const colDuration = PAGE.right - 110;
+
+            // Table header
+            doc
+                .rect(
+                    PAGE.left,
+                    doc.y,
+                    PAGE.contentWidth,
+                    22
+                )
+                .fill(C.oliveDark);
+
+            doc
+                .font('Helvetica-Bold')
+                .fontSize(7.5)
+                .fillColor(C.white)
+                .text('OPERATION', colOperation + 8, doc.y + 7);
+
+            doc
+                .text('DURATION', colDuration, doc.y + 7, {
+                    width: 100,
+                    align: 'right',
+                });
+
+            doc.y += 22;
+
+            let operationIndex = 0;
+
+            Object.entries(benchOps).forEach(([operation, timeMs]) => {
+                if (PAGE.bottom - doc.y < 24) {
+                    newPage();
+                }
+
+                const rowY = doc.y;
+
+                if (operationIndex % 2 === 0) {
+                    doc
+                        .rect(
+                            PAGE.left,
+                            rowY,
+                            PAGE.contentWidth,
+                            21
+                        )
+                        .fill(C.paperAlt);
+                }
+
+                doc
+                    .font('Helvetica')
+                    .fontSize(8)
+                    .fillColor(C.text)
+                    .text(operation, colOperation + 8, rowY + 6);
+
+                doc
+                    .font('Courier')
+                    .fontSize(7.5)
+                    .fillColor(C.olive)
+                    .text(`${timeMs} ms`, colDuration, rowY + 6, {
+                        width: 100,
+                        align: 'right',
+                    });
+
+                doc.y = rowY + 21;
+                operationIndex += 1;
+            });
+
+            doc.moveDown(0.7);
+
+            // Summary metrics
+            const metrics = [
+                [
+                    'Encryption Phase',
+                    `${data.benchmark?.timing?.encryptionPhaseMs ?? 'N/A'} ms`,
+                ],
+                [
+                    'Decryption Phase',
+                    `${data.benchmark?.timing?.decryptionPhaseMs ?? 'N/A'} ms`,
+                ],
+                [
+                    'Total Pipeline',
+                    `${data.benchmark?.timing?.totalElapsedMs ?? 'N/A'} ms`,
+                ],
+                [
+                    'Throughput',
+                    `${data.benchmark?.analysis?.throughputKBps ?? 'N/A'} KB/s`,
+                ],
+            ];
+
+            ensureSpace(metrics.length * 28 + 25);
+
+            metrics.forEach(([label, value]) => {
+                const y = doc.y;
+
+                doc
+                    .font('Helvetica-Bold')
+                    .fontSize(8)
+                    .fillColor(C.textSoft)
+                    .text(label, PAGE.left + 10, y + 5, {
+                        width: 180,
+                    });
+
+                doc
+                    .font('Courier')
+                    .fontSize(8)
+                    .fillColor(C.olive)
+                    .text(value, PAGE.right - 150, y + 5, {
+                        width: 140,
+                        align: 'right',
+                    });
+
+                doc
+                    .moveTo(PAGE.left, y + 24)
+                    .lineTo(PAGE.right, y + 24)
+                    .lineWidth(0.5)
+                    .strokeColor(C.border)
+                    .stroke();
+
+                doc.y = y + 28;
+            });
+
+            /* ============================================================
+             * OPTIONAL FINAL PLAINTEXT RESULT
+             * ============================================================
+             */
+
+            if (data.finalResult?.plaintext || data.decryption?.plaintext) {
+                drawSectionTitle(
+                    7,
+                    'Recovered Plaintext',
+                    'Plaintext reconstructed after RSA session-key recovery and AES-GCM verification.'
+                );
+
+                drawLongTextBlock({
+                    label: 'DECRYPTED PLAINTEXT',
+                    value:
+                        data.finalResult?.plaintext ||
+                        data.decryption?.plaintext,
+                    mono: true,
+                    fontSize: 7.5,
+                });
+            }
+
+            /* ============================================================
+             * FINAL DOCUMENT NOTE
+             * ============================================================
+             */
+
+            ensureSpace(70);
+
+            doc
+                .moveTo(PAGE.left, doc.y)
+                .lineTo(PAGE.right, doc.y)
+                .lineWidth(1)
+                .strokeColor(C.olive)
+                .stroke();
+
+            doc.moveDown(0.8);
+
+            doc
+                .font('Helvetica')
+                .fontSize(7)
+                .fillColor(C.muted)
+                .text(
+                    'Generated by SecureNet Defence Communication Network. ' +
+                    'This report represents the recorded execution state and benchmark measurements for the specified transmission.',
+                    PAGE.left,
+                    doc.y,
+                    {
+                        width: PAGE.contentWidth,
+                        lineGap: 2,
+                    }
+                );
+
+            /* ============================================================
+             * END
+             * ============================================================
+             */
+
+            doc.end();
+        } catch (err) {
+            reject(err);
         }
-    ],
-
-    decryption: [
-        {
-            step: 7,
-            algorithm: "Ed25519",
-            title: "...",
-            input: {...},
-            process: {...},
-            output: {...},
-            status: "passed"
-        }
-    ],
-
-    cryptographicMaterial: {
-        ed25519: {},
-        ecdh: {},
-        hkdf: {},
-        rsa: {},
-        aes: {},
-        signature: {}
-    },
-
-    packet: {
-        senderId,
-        ecdhPublicKey,
-        wrappedSessionKey,
-        ciphertext,
-        iv,
-        authTag,
-        signature
-    },
-
-    verification: {},
-
-    benchmark: {},
-
-    finalResult: {
-        success: true
-    }
-}
-```
-
----
-
-# 33. REPORT LANGUAGE: INPUT → PROCESS → OUTPUT
-
-Every cryptographic step in the final report must explicitly communicate:
-
-```text
-INPUT
-↓
-PROCESS
-↓
-OUTPUT
-```
-
-For example:
-
-## ECDH
-
-```text
-STEP 02 / ECDH KEY EXCHANGE
-
-INPUT
-Base A public/private key pair
-Base B public/private key pair
-
-PROCESS
-Both endpoints independently perform ECDH key agreement.
-
-OUTPUT
-Shared secret established.
-
-Base A Public Key: 04ab********
-Base B Public Key: 04f1********
-Shared Secret: 98cd********
-
-STATUS
-PASSED
-```
-
----
-
-# 34. REPORT ENCRYPTION SECTION
-
-Build the complete encryption narrative.
-
-Example:
-
-```text
-ENCRYPTION PHASE
-────────────────────────────────
-
-01 / ED25519 AUTHENTICATION
-
-INPUT
-Sender identity initialization
-
-PROCESS
-Generate Ed25519 signing key pair.
-
-OUTPUT
-Public Key: 7a3f********
-
-STATUS ✓
-
-
-02 / ECDH KEY EXCHANGE
-
-INPUT
-Endpoint A and Endpoint B key pairs
-
-PROCESS
-Establish shared secret.
-
-OUTPUT
-Base A Public Key: 04ab********
-Base B Public Key: 04f1********
-Shared Secret: 98cd********
-
-STATUS ✓
-
-
-03 / HKDF KEY DERIVATION
-
-INPUT
-ECDH shared secret
-
-PROCESS
-Derive 256-bit AES session key.
-
-OUTPUT
-Salt: 9e41********
-HKDF Info: 7365********
-Session Key: bc72********
-
-STATUS ✓
-
-
-04 / RSA-OAEP KEY PROTECTION
-
-INPUT
-AES session key
-
-PROCESS
-Wrap the session key using RSA-OAEP.
-
-OUTPUT
-RSA Public Key: MIIB********
-Wrapped Session Key: 8fd2********
-
-STATUS ✓
-
-
-05 / AES-256-GCM ENCRYPTION
-
-INPUT
-"Thanks a lot GPT"
-+
-AES session key
-
-PROCESS
-Encrypt plaintext using AES-256-GCM.
-
-OUTPUT
-Ciphertext: d06d********
-IV: fd44********
-Auth Tag: dbecc32b********
-
-STATUS ✓
-
-
-06 / PACKET SIGNING
-
-INPUT
-Secure packet
-
-PROCESS
-Sign packet using Ed25519.
-
-OUTPUT
-Signature: a71f********
-
-STATUS ✓
-```
-
----
-
-# 35. REPORT DECRYPTION SECTION
-
-Then:
-
-```text
-DECRYPTION PHASE
-────────────────────────────────
-
-07 / SIGNATURE VERIFICATION
-
-INPUT
-Received secure packet
-+
-Ed25519 signature
-
-PROCESS
-Verify packet signature.
-
-OUTPUT
-Signature valid: TRUE
-
-STATUS ✓
-
-
-08 / RSA SESSION KEY RECOVERY
-
-INPUT
-Wrapped session key
-+
-RSA private key
-
-PROCESS
-Recover AES session key using RSA-OAEP.
-
-OUTPUT
-Recovered Session Key: bc72********
-
-STATUS ✓
-
-
-09 / AES-256-GCM DECRYPTION
-
-INPUT
-Ciphertext
-+
-Recovered session key
-+
-IV
-+
-Authentication tag
-
-PROCESS
-Decrypt ciphertext and validate authentication tag.
-
-OUTPUT
-Session Key: bc72********
-
-Plaintext:
-Thanks a lot GPT
-
-STATUS ✓
-```
-
----
-
-# 36. CRYPTOGRAPHIC MATERIAL SECTION
-
-The report must also contain a dedicated section for the cryptographic material gathered during execution.
-
-Include:
-
-```text
-ED25519
-Public Key
-Private Key
-
-ECDH
-Base A Public Key
-Base A Private Key
-Base B Public Key
-Base B Private Key
-Shared Secret
-
-HKDF
-Salt
-Info
-Session Key
-
-RSA
-Public Key
-Private Key
-Wrapped Session Key
-Recovered Session Key
-
-AES-256-GCM
-Session Key
-Ciphertext
-IV
-Authentication Tag
-
-SIGNATURE
-Ed25519 Signature
-```
-
-For the UI response, use the masking policy.
-
-For the exported educational report, use the report's configured representation.
-
-Important: treat all generated private/session keys as demo-only ephemeral material, never as production credentials.
-
----
-
-# 37. BENCHMARK SECTION IN FINAL REPORT
-
-Benchmark analysis must appear in the final report.
-
-Example:
-
-```text
-PERFORMANCE ANALYSIS
-────────────────────────────────
-
-OPERATION              TIME
-
-Ed25519 Generation     4.9164 ms
-ECDH Exchange          1.0047 ms
-HKDF Derivation        1.8473 ms
-RSA Generation         189.7387 ms
-RSA Wrap               1.0577 ms
-AES Encryption         0.8370 ms
-Ed25519 Sign           0.5821 ms
-Ed25519 Verify         0.4396 ms
-RSA Unwrap             1.5910 ms
-AES Decryption         0.3196 ms
-
-TOTAL EXECUTION        202.8474 ms
-```
-
-The values must come from the actual execution.
-
-The current uploaded benchmark response demonstrates this exact timing dataset structure. 
-
-Do not fabricate values.
-
----
-
-# 38. SIZE ANALYSIS
-
-Include:
-
-```text
-INPUT SIZE
-284 bytes
-
-SESSION KEY
-32 bytes
-
-WRAPPED SESSION KEY
-256 bytes
-
-CIPHERTEXT
-284 bytes
-
-IV
-12 bytes
-
-AUTH TAG
-16 bytes
-
-SIGNATURE
-64 bytes
-```
-
-Use actual data from the execution context.
-
-The current implementation already records these size fields. 
-
----
-
-# 39. VERIFICATION SECTION
-
-Build a final verification summary:
-
-```text
-FINAL VERIFICATION
-────────────────────────────────
-
-ECDH SHARED SECRET       ✓ PASS
-ED25519 SIGNATURE        ✓ PASS
-RSA SESSION KEY RECOVERY ✓ PASS
-AES-GCM DECRYPTION       ✓ PASS
-PLAINTEXT MATCH          ✓ PASS
-
-FINAL STATUS
-TRANSMISSION VERIFIED
-```
-
-The verification state should derive from actual execution results, not hardcoded values.
-
-The existing benchmark structure already tracks:
-
-```text
-sharedSecretsMatch
-signatureValid
-decryptionSuccess
-plaintextMatch
-```
-
-which should become part of the unified Execution Context. 
-
----
-
-# 40. ROUTES
-
-Implement the following routes.
-
-## Upload
-
-```http
-POST /api/upload
-```
-
----
-
-## Workflow
-
-```http
-POST /api/workflow/start
-POST /api/workflow/step
-GET  /api/workflow/:workflowId
-POST /api/workflow/reset
-```
-
-Workflow remains the interactive educational demonstration.
-
----
-
-## Process
-
-```http
-POST /api/process/run
-GET  /api/process/:executionId
-```
-
-The Process route must execute the full algorithm.
-
-It must NOT call Benchmark directly.
-
----
-
-## Report
-
-```http
-GET /api/report/:executionId
-```
-
-This triggers:
-
-```text
-report.service
-    ↓
-benchmark.service
-    ↓
-final report assembly
-```
-
----
-
-# 41. NO BENCHMARK ROUTE
-
-Do NOT create or use:
-
-```http
-POST /api/benchmark/run
-```
-
-Benchmark is an internal service.
-
-The Analysis page requests the report.
-
-The report service internally calls benchmark analysis.
-
----
-
-# 42. PROCESS ROUTING
-
-Mission page button:
-
-```text
-RUN ALGORITHM
-```
-
-must perform:
-
-```text
-POST /api/process/run
-        ↓
-processController
-        ↓
-process.service
-        ↓
-crypto.service
-        ↓
-complete execution
-        ↓
-Execution Context saved
-        ↓
-executionId
-        ↓
-navigate to:
-
-/analysis/:executionId
-```
-
-Do not navigate to a benchmark page.
-
----
-
-# 43. WORKFLOW ROUTING
-
-Mission page button:
-
-```text
-RUN SECURE DEMONSTRATION
-```
-
-must perform:
-
-```text
-POST /api/workflow/start
-        ↓
-workflowId + executionId
-        ↓
-/pipeline/:workflowId
-```
-
-Then each step uses:
-
-```text
-POST /api/workflow/step
-```
-
-At each step:
-
-```text
-execute
-↓
-record result
-↓
-record timing
-↓
-update execution context
-↓
-return step response
-```
-
-Pipeline telemetry only displays the current/last operation timing and basic state.
-
----
-
-# 44. WORKFLOW VS PROCESS
-
-Do NOT duplicate cryptographic implementation.
-
-Both must use:
-
-```text
-crypto.service.js
-```
-
-Conceptually:
-
-```text
-                 CRYPTO SERVICE
-                       │
-             ┌─────────┴─────────┐
-             │                   │
-             ▼                   ▼
-         WORKFLOW             PROCESS
-         "show it"           "run it"
-```
-
-Workflow controls user progression.
-
-Process executes the full sequence.
-
-They must share the same cryptographic implementation.
-
----
-
-# 45. EXECUTION CONTEXT EXAMPLE
-
-For this exact message:
-
-```text
-Thanks a lot GPT
-```
-
-the resulting context should conceptually become:
-
-```text
-EXECUTION A001
-
-INPUT
-└── Thanks a lot GPT
-
-ED25519
-├── private key
-└── public key
-
-ECDH
-├── Base A private
-├── Base A public
-├── Base B private
-├── Base B public
-├── shared secret A
-└── shared secret B
-
-HKDF
-├── salt
-├── info
-└── session key
-
-RSA
-├── public key
-├── private key
-├── wrapped session key
-└── recovered session key
-
-AES
-├── plaintext
-├── session key
-├── ciphertext
-├── IV
-└── auth tag
-
-SIGNATURE
-└── Ed25519 signature
-
-VERIFICATION
-├── shared secrets match
-├── signature valid
-├── decryption successful
-└── plaintext match
-
-MEASUREMENTS
-├── Ed25519 generation
-├── ECDH
-├── HKDF
-├── RSA generation
-├── RSA wrap
-├── AES encryption
-├── signing
-├── verification
-├── RSA unwrap
-├── AES decryption
-└── total
-
-WORKFLOW
-└── completed step records
-
-BENCHMARK
-└── generated only during report analysis
-
-REPORT
-└── generated representation
-```
-
----
-
-# 46. REPORT MUST NOT BE A SECOND EXECUTION
-
-This is mandatory.
-
-When:
-
-```text
-GET /api/report/:executionId
-```
-
-is called:
-
-DO:
-
-```text
-load execution
-↓
-benchmark analyze execution
-↓
-build report
-↓
-return report
-```
-
-DO NOT:
-
-```text
-generate new Ed25519 keys
-generate new ECDH keys
-derive new session key
-encrypt again
-decrypt again
-```
-
-The report describes the existing execution.
-
----
-
-# 47. DON'T LET REPORT SERVICE BECOME CRYPTO SERVICE
-
-Report service must not directly perform:
-
-```text
-generateEdKeys()
-encryptMessage()
-decryptMessage()
-keyExchange()
-```
-
-It only reads stored results.
-
----
-
-# 48. DON'T LET BENCHMARK SERVICE BECOME PROCESS SERVICE
-
-Benchmark service must not perform:
-
-```text
-encryptComplete()
-decryptComplete()
-```
-
-It only analyzes:
-
-```text
-measurements
-sizes
-verification
-execution metadata
-```
-
----
-
-# 49. SERVICE RESPONSIBILITY TABLE
-
-Implement according to this:
-
-| Service                | Main Job                       | Crypto Execution |      Timing Collection |        Analysis | Report |
-| ---------------------- | ------------------------------ | ---------------: | ---------------------: | --------------: | -----: |
-| `crypto.service.js`    | cryptographic primitives       |                ✅ | through timing wrapper |               ❌ |      ❌ |
-| `workflow.service.js`  | step-by-step demonstration     |     ✅ via crypto |                      ✅ |               ❌ |      ❌ |
-| `process.service.js`   | complete algorithm execution   |     ✅ via crypto |                      ✅ |               ❌ |      ❌ |
-| `benchmark.service.js` | analyze execution measurements |                ❌ |                      ❌ |               ✅ |      ❌ |
-| `report.service.js`    | aggregate final report         |                ❌ |                      ❌ | ✅ via benchmark |      ✅ |
-
----
-
-# 50. CONTROLLER RESPONSIBILITIES
-
-Controllers must be thin.
-
-### `processController.js`
-
-Responsible for:
-
-```text
-request
-validation
-process_run()
-response
-error handling
-```
-
-### `workflowController.js`
-
-Responsible for:
-
-```text
-request
-validation
-workflow service
-response
-error handling
-```
-
-### `analysisController.js`
-
-Responsible for:
-
-```text
-executionId
-report.service
-response
-```
-
-Do not put crypto logic inside controllers.
-
-Do not put report construction inside controllers.
-
----
-
-# 51. REPORT EXPORT PREPARATION
-
-Design the report object so it can later support:
-
-```text
-TXT
-PDF
-```
-
-The backend response should be structured data first.
-
-Then later:
-
-```text
-report.service
-      ↓
-report object
-      ├── analysis JSON
-      ├── TXT formatter
-      └── PDF formatter
-```
-
-Do not mix PDF-generation code into benchmark service.
-
----
-
-# 52. ERROR HANDLING
-
-If any operation fails:
-
-```text
-Execution Context status = "failed"
-```
-
-Store:
-
-```js
-error: {
-    step,
-    algorithm,
-    message
-}
-```
-
-The workflow/process must stop appropriately.
-
-The final report should show:
-
-```text
-FAILED AT STEP 05
-AES-256-GCM
-Reason: ...
-```
-
-Do not hide the failure.
-
----
-
-# 53. DO NOT INVENT DATA
-
-Never generate fake:
-
-```text
-timings
-keys
-ciphertext
-signatures
-plaintext
-verification
-packet values
-```
-
-All values must originate from the actual cryptographic execution.
-
-Especially do not use fixed benchmark numbers for the UI.
-
----
-
-# 54. IMPLEMENTATION ORDER
-
-Implement in this exact order.
-
-### Phase 1
-
-Create:
-
-```text
-executionStore.js
-maskSensitive.js
-```
-
----
-
-### Phase 2
-
-Refactor `process.service.js`.
-
-Requirements:
-
-* complete algorithm
-* execution context
-* real timing
-* real results
-* final verification
-* no benchmark invocation
-* no self-execution
-
----
-
-### Phase 3
-
-Fix `processController.js`.
-
-Replace:
-
-```js
-runBenchmarkProcess()
-```
-
-with:
-
-```js
-process_run()
-```
-
----
-
-### Phase 4
-
-Refactor `workflow.service.js`.
-
-Requirements:
-
-* shared execution context
-* 9 steps
-* enriched step response
-* masked sensitive values
-* timing for telemetry
-* no benchmark analysis
-
----
-
-### Phase 5
-
-Refactor `benchmark.service.js`.
-
-Delete its cryptographic execution responsibility.
-
-Implement:
-
-```js
-analyzeExecution(executionContext)
-```
-
----
-
-### Phase 6
-
-Implement `report.service.js`.
-
-Implement:
-
-```js
-generateReport(executionId)
-```
-
-It should:
-
-```text
-load execution
-↓
-benchmark analysis
-↓
-build summary
-↓
-build encryption analysis
-↓
-build decryption analysis
-↓
-attach crypto material
-↓
-attach packet
-↓
-attach verification
-↓
-attach benchmark
-↓
-final result
-```
-
----
-
-### Phase 7
-
-Add:
-
-```http
-GET /api/report/:executionId
-```
-
----
-
-### Phase 8
-
-Verify the complete Process flow with:
-
-```text
-Thanks a lot GPT
-```
-
----
-
-# 55. EXPECTED PROCESS FLOW FOR TESTING
-
-Use:
-
-```text
-Thanks a lot GPT
-```
-
-and confirm:
-
-```text
-POST /api/process/run
-        ↓
-process_run()
-        ↓
-Execution Context created
-        ↓
-Ed25519
-        ↓
-ECDH
-        ↓
-HKDF
-        ↓
-RSA
-        ↓
-AES
-        ↓
-Ed25519 sign
-        ↓
-Ed25519 verify
-        ↓
-RSA unwrap
-        ↓
-AES decrypt
-        ↓
-original === recovered
-        ↓
-Execution Context completed
-        ↓
-executionId
-```
-
-Then:
-
-```text
-GET /api/report/:executionId
-        ↓
-report.service
-        ↓
-benchmark.service.analyzeExecution()
-        ↓
-full report returned
-```
-
----
-
-# 56. EXPECTED WORKFLOW FLOW FOR TESTING
-
-Use:
-
-```text
-Thanks a lot GPT
-```
-
-Then:
-
-```text
-POST /api/workflow/start
-        ↓
-workflowId
-        ↓
-step 1
-        ↓
-step 2
-        ↓
-step 3
-        ↓
-...
-        ↓
-step 9
-        ↓
-workflow completed
-        ↓
-execution context complete
-```
-
-At every step, the Pipeline should receive:
-
-```text
-step
-phase
-status
-title
-description
-algorithm
-details
-```
-
-plus telemetry information separately.
-
----
-
-# 57. TELEMETRY EXPECTATION
-
-Pipeline UI should be able to show:
-
-```text
-TELEMETRY
-
-1.85 ms
-LAST OPERATION
-
-HKDF
-
-CHANNEL
-ACTIVE
-
-INTEGRITY
-NOMINAL
-```
-
-or:
-
-```text
-0.32 ms
-LAST OPERATION
-
-AES-256-GCM DECRYPTION
-
-CHANNEL
-AES-GCM / 256
-
-INTEGRITY
-NOMINAL
-```
-
-Do not expose the entire benchmark analysis object to Pipeline.
-
----
-
-# 58. FINAL OUTPUT EXPECTATION
-
-The Analysis page should ultimately be able to render:
-
-```text
-SECURE TRANSMISSION ANALYSIS
-
-EXECUTION
-exec-001
-
-MISSION INPUT
-Thanks a lot GPT
-
-─────────────────────────────
-
-ENCRYPTION
-01 / ED25519
-02 / ECDH
-03 / HKDF
-04 / RSA-OAEP
-05 / AES-256-GCM
-06 / ED25519 SIGNATURE
-
-─────────────────────────────
-
-DECRYPTION
-07 / SIGNATURE VERIFICATION
-08 / RSA SESSION KEY RECOVERY
-09 / AES-256-GCM DECRYPTION
-
-─────────────────────────────
-
-CRYPTOGRAPHIC MATERIAL
-public keys
-private keys
-shared secret
-session key
-RSA keys
-wrapped session key
-ciphertext
-IV
-auth tag
-signature
-
-─────────────────────────────
-
-PERFORMANCE
-actual timings
-
-─────────────────────────────
-
-VERIFICATION
-all actual statuses
-
-─────────────────────────────
-
-FINAL RESULT
-
-TRANSMISSION VERIFIED
-```
-
----
-
-# 59. MOST IMPORTANT RULES
-
-Keep these rules throughout implementation:
-
-```text
-1. Process executes the complete algorithm.
-
-2. Workflow demonstrates the algorithm step-by-step.
-
-3. Both use crypto.service.js.
-
-4. Both populate one Execution Context.
-
-5. timingUtils measures operations.
-
-6. Benchmark analyzes collected measurements.
-
-7. Benchmark does not perform cryptography.
-
-8. Benchmark has no frontend route.
-
-9. Report service loads the completed Execution Context.
-
-10. Report service calls Benchmark internally.
-
-11. Report service never reruns cryptography.
-
-12. Workflow responses contain masked sensitive data.
-
-13. Raw execution values remain inside the execution context.
-
-14. All timings must be real.
-
-15. All cryptographic values must be real.
-
-16. No fake benchmark values.
-
-17. Process controller must call process_run(), not benchmark.
-
-18. Report must explicitly describe INPUT → PROCESS → OUTPUT for each step.
-
-19. Encryption and decryption belong to one Execution Context.
-
-20. Keep every service modular and independently replaceable.
-```
-
----
-
-# 60. FINAL ARCHITECTURE TO IMPLEMENT
-
-The resulting structure should be:
-
-```text
-MISSION PAGE
-│
-├── RUN SECURE DEMONSTRATION
-│       │
-│       ▼
-│   POST /api/workflow/start
-│       │
-│       ▼
-│   WORKFLOW SERVICE
-│       │
-│       ▼
-│   PIPELINE PAGE
-│       │
-│       ├── step-by-step execution
-│       └── lightweight telemetry
-│
-└── RUN ALGORITHM
-        │
-        ▼
-    POST /api/process/run
-        │
-        ▼
-    PROCESS SERVICE
-        │
-        ▼
-    COMPLETE EXECUTION
-        │
-        ▼
-    EXECUTION CONTEXT
-        │
-        ▼
-    /analysis/:executionId
-        │
-        ▼
-    GET /api/report/:executionId
-        │
-        ▼
-    REPORT SERVICE
-        │
-        ├── Execution Context
-        │
-        ├── Workflow / Process information
-        │
-        ├── Cryptographic material
-        │
-        ├── Verification
-        │
-        └── Benchmark Service
-                │
-                ▼
-          PERFORMANCE ANALYSIS
-                │
-                ▼
-          FINAL ANALYSIS REPORT
-                │
-                ├── UI
-                ├── TXT export
-                └── PDF export
-```
-
-**Implement this architecture without introducing redundant services, duplicate crypto execution, fake benchmark calculations, or new benchmark routes. Preserve the existing crypto primitives wherever they are already correct, and refactor the orchestration around them.**
+    });
+};

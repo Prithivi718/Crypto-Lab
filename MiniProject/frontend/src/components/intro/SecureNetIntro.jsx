@@ -18,6 +18,7 @@ import { useIntroAudio } from '../../hooks/useIntroAudio';
 import { IntroProgress } from './IntroProgress';
 import { IntroSpeech } from './IntroSpeech';
 import { IntroLogoTransition } from './IntroLogoTransition';
+import { DotGrid } from '../backgrounds/DotGrid';
 import './SecureNetIntro.css';
 
 const SENTENCES = [
@@ -246,6 +247,16 @@ export function SecureNetIntro({ onIntroComplete, onStartTransition }) {
 
     return (
         <div className={`securenet-intro-overlay ${phase.toLowerCase()}`}>
+            {/* ── Layer 0: Animated dot grid background (army palette, pointer-events: none) ── */}
+            <DotGrid
+                dotColor="#4B5320"
+                dotColorHover="#929A68"
+                dotSize={5}
+                dotSpacing={28}
+                rippleRadius={90}
+                rippleStrength={0.55}
+            />
+
             {/* Screen vibration pulse during visual hammer impacts */}
             <div className={`intro-viewport ${impactActive ? 'vibrate-hit' : ''}`}>
                 {/* Phase 1: Readiness sequence & 4-stage (25% hits) visual progress bar */}
