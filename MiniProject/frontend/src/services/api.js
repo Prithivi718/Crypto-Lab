@@ -1,7 +1,6 @@
 /* global process */
-const API_BASE_URL = typeof window !== 'undefined' && window.API_URL
-    ? window.API_URL
-    : "http://localhost:5000/api";
+const API_BASE_URL =
+    import.meta.env.VITE_API_URL || "http://localhost:5000/api"; 
 
 export const checkHealth = async () => {
     const response = await fetch(`${API_BASE_URL}/health`);
