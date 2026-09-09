@@ -10,7 +10,7 @@ const app = express();
 // CORS Middleware
 app.use((req, res, next) => {
     const allowedOrigins = [
-        "https://crypto-lab-eight.vercel.app",
+        "https://fgsecurenet.vercel.app",
         "http://localhost:5000",
         "http://localhost:5173"
     ];
