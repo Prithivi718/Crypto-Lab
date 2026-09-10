@@ -1,5 +1,3 @@
-import fs from 'node:fs/promises';
-import { startWorkflow } from '../services/workflow.service.js';
 import { successResponse, errorResponse } from '../utils/responseUtils.js';
 
 export const handleUpload = async (req, res) => {
@@ -8,8 +6,7 @@ export const handleUpload = async (req, res) => {
             return errorResponse(res, 'No file uploaded', 'MISSING_FILE', 400);
         }
 
-        const filePath = req.file.path;
-        const fileContent = await fs.readFile(filePath, 'utf8');
+        const fileContent = req.file.buffer.toString('utf8');
 
         if (!fileContent || fileContent.trim() === '') {
             return errorResponse(res, 'File is empty', 'EMPTY_FILE', 400);
@@ -18,7 +15,7 @@ export const handleUpload = async (req, res) => {
         return successResponse(
             res,
             {
-                filename: req.file.originalname || req.file.filename,
+                filename: req.file.originalname || 'upload.txt',
                 fileSize: req.file.size,
                 extractedText: fileContent
             },
