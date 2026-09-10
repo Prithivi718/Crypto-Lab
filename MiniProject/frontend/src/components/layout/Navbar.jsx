@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import logo from '../../assets/logo.png';
+import TeamOverlay from '../team/TeamOverlay';
 import './Navbar.css';
 
 const NAV_ITEMS = [
@@ -13,6 +14,7 @@ const NAV_ITEMS = [
 
 export const Navbar = ({ isLogoHidden }) => {
     const [activeSection, setActiveSection] = useState('home');
+    const [isTeamOpen, setIsTeamOpen] = useState(false);
 
     useEffect(() => {
         const sectionIds = ['home', 'mission', 'indicators', 'concepts', 'pipeline', 'analysis'];
@@ -57,43 +59,53 @@ export const Navbar = ({ isLogoHidden }) => {
     };
 
     return (
-        <nav className="site-navbar" role="navigation" aria-label="Main navigation">
-            <div className="navbar-inner">
-                {/* Brand */}
-                <a
+        <>
+            <nav className="site-navbar" role="navigation" aria-label="Main navigation">
+                <div className="navbar-inner">
+                    {/* Brand */}
+                    <a
+                        href="#team"
+                        className="navbar-brand"
+                        onClick={e => { e.preventDefault(); setIsTeamOpen(true); }}
+                        aria-label="Open team showcase"
+                        aria-haspopup="dialog"
+                    >
+                        {/* <a
                     href="#mission"
                     className="navbar-brand"
                     onClick={e => handleNavClick(e, 'mission')}
                     aria-label="SECURENET Home"
-                >
-                    <img
-                        id="navbar-brand-logo"
-                        src={logo}
-                        alt="SecureNet logo"
-                        className={`brand-logo${isLogoHidden ? ' logo-hidden' : ''}`}
-                        style={isLogoHidden ? { opacity: 0 } : undefined}
-                    />
-                    <div className="brand-text">
-                        <span className="brand-name">SECURENET</span>
-                        <span className="brand-sub">DEFENCE COMMUNICATIONS</span>
-                    </div>
-                </a>
+                > */}
+                        <img
+                            id="navbar-brand-logo"
+                            src={logo}
+                            alt="SecureNet logo"
+                            className={`brand-logo${isLogoHidden ? ' logo-hidden' : ''}`}
+                            style={isLogoHidden ? { opacity: 0 } : undefined}
+                        />
+                        <div className="brand-text">
+                            <span className="brand-name">SECURENET</span>
+                            <span className="brand-sub">DEFENCE COMMUNICATIONS</span>
+                        </div>
+                    </a>
 
-                {/* Links */}
-                <ul className="navbar-links" role="list">
-                    {NAV_ITEMS.map(item => (
-                        <li key={item.id}>
-                            <a
-                                href={`#${item.id}`}
-                                className={`nav-link${activeSection === item.id ? ' active' : ''}`}
-                                onClick={e => handleNavClick(e, item.id)}
-                            >
-                                {item.label}
-                            </a>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-        </nav>
+                    {/* Links */}
+                    <ul className="navbar-links" role="list">
+                        {NAV_ITEMS.map(item => (
+                            <li key={item.id}>
+                                <a
+                                    href={`#${item.id}`}
+                                    className={`nav-link${activeSection === item.id ? ' active' : ''}`}
+                                    onClick={e => handleNavClick(e, item.id)}
+                                >
+                                    {item.label}
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </nav>
+            <TeamOverlay isOpen={isTeamOpen} onClose={() => setIsTeamOpen(false)} />
+        </>
     );
 };
