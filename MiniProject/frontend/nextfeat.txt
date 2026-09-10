@@ -1,266 +1,108 @@
-Yep — and **the dots should absolutely render behind the text/content**, not as a panel sitting over it. The React Bits Dot Grid is a canvas/background-style component, so the clean implementation is to make it an absolute background layer inside the intro, while the existing initialization UI remains above it. ([shadcnregistry][1])
+# SecureNet — Secure Defence Communication Network
 
-Use this prompt:
+> A full-stack educational demonstration of secure defence communication using modern hybrid cryptography.
 
-````text
-Add React Bits `DotGrid` as the animated background for the SecureNet cinematic intro.
+SecureNet is an interactive cryptographic communication platform designed to demonstrate how sensitive defence messages can be protected through a complete end-to-end security pipeline.
 
-REFERENCE:
-React Bits Dot Grid:
-https://reactbits.dev/backgrounds/dot-grid
+Instead of relying on a single cryptographic algorithm, SecureNet combines multiple cryptographic mechanisms, where each algorithm has a specific security responsibility.
 
-DEPENDENCY:
-Run:
-npm install gsap
+---
 
-GSAP is required by the React Bits Dot Grid implementation. :contentReference[oaicite:1]{index=1}
+## Overview
 
-IMPORTANT DESIGN GOAL:
-I want the Dot Grid to behave like a REAL BACKGROUND, not a card, not a separate overlay panel, and not something that blocks the intro content.
+SecureNet demonstrates a secure communication flow between two simulated defence communication bases:
 
-The dots must visually continue behind:
-- SECURENET logo
-- DEFENCE COMMUNICATIONS subtitle
-- initialization status box
-- INITIALIZE SECURE CHANNEL button
-- SKIP INTRO button
-- status/microcopy
-- VOICE // ON control
+- **BASE-A** — Sender
+- **BASE-B** — Receiver
 
-The text/UI must remain fully readable above the dots.
+A mission briefing or confidential text message is processed through a complete cryptographic workflow before being transmitted and recovered.
 
-CURRENT SCREEN:
-The intro currently has a very dark tactical background with centered SecureNet branding and initialization controls.
+The system demonstrates:
 
-DO NOT redesign the current layout.
+- Identity authentication
+- Secure key agreement
+- Session-key derivation
+- Session-key protection
+- Authenticated encryption
+- Digital signing
+- Signature verification
+- Session-key recovery
+- Secure decryption
+- Integrity and plaintext verification
+- Execution timing and analysis
 
-IMPLEMENTATION:
+---
 
-1. Install GSAP:
-```bash
-npm install gsap
-````
+# Core Cryptographic Workflow
 
-2. Add the React Bits `DotGrid` component using the official React Bits implementation/pattern from:
-   [https://reactbits.dev/backgrounds/dot-grid](https://reactbits.dev/backgrounds/dot-grid)
-
-Do not invent a different dot-grid implementation unless the existing React Bits component cannot be integrated cleanly.
-
-3. Place DotGrid INSIDE the SecureNet intro as the lowest visual layer.
-
-Desired layer structure:
+The central SecureNet pipeline is:
 
 ```text
-securenet-intro-overlay
-│
-├── DotGrid background
-│
-├── existing dark/gradient treatment if needed
-│
-├── existing intro content
-│   ├── SecureNet logo
-│   ├── Defence Communications
-│   ├── initialization panel
-│   ├── Initialize Secure Channel
-│   ├── Skip Intro
-│   └── other controls
-│
-└── existing interaction controls
-```
+                 SECURENET CRYPTOGRAPHIC PIPELINE
 
-CSS layering should effectively be:
-
-```text
-DotGrid:
-    position: absolute/fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-
-Content:
-    position: relative;
-    z-index: 1;
-
-Buttons:
-    remain clickable;
-```
-
-Do NOT set DotGrid above the content.
-
-4. The Dot Grid should fill the ENTIRE intro viewport.
-
-It must not be constrained to:
-
-* the central card
-* the initialization box
-* a small rectangle
-* a fixed-width container
-
-It should span edge-to-edge behind the entire screen.
-
-5. Keep the existing dark tactical aesthetic.
-
-The dots should be subtle:
-
-* restrained military olive/gray tone
-* low visual intensity
-* no neon cyberpunk appearance
-* no bright gaming aesthetic
-* no excessive glow
-* no distracting particle explosion
-
-The screenshot's current background is intentionally dark. Preserve that mood.
-
-6. IMPORTANT:
-   The dots need to remain visible BEHIND the text.
-
-Do NOT solve readability by putting a large opaque background behind every piece of text.
-
-Instead:
-
-* keep the DotGrid visible through the negative space around the content
-* use subtle opacity/gradient/vignette where necessary
-* preserve text contrast naturally
-
-The visual should feel like the UI is sitting inside an active secure command environment.
-
-7. Keep the DotGrid interaction behavior from React Bits.
-
-Do not remove the intended cursor interaction/animation just because it is behind the content.
-
-However:
-
-* the DotGrid itself must use `pointer-events: none` if required so it does not intercept button clicks
-* the intro buttons must remain completely functional
-
-If the React Bits DotGrid implementation needs pointer events for its own mouse tracking, use the cleanest architecture that preserves the effect without blocking interaction.
-
-8. Make sure the DotGrid begins when the intro is shown and is cleaned up correctly when the intro is removed.
-
-No memory leaks.
-No orphaned GSAP animations.
-No duplicate animation instances after React re-renders.
-
-Use proper React cleanup.
-
-9. Do not change the cinematic state machine.
-
-Preserve:
-
-* readiness sequence
-* Initialize Secure Channel
-* hammer audio behavior
-* progress/forging sequence
-* secure channel ready
-* Enter SecureNet
-* TTS
-* center logo
-* logo → navbar transition
-* Skip Intro
-* sessionStorage behavior
-
-10. Do not bring back `HomeBootReveal`.
-
-That previous fake radar/grid reconstruction is unwanted.
-
-The DotGrid belongs ONLY to the SecureNet INTRO experience.
-
-The actual Home transition remains separate:
-logo → navbar → actual LandingPage → existing GridDistortion.
-
-11. Avoid duplicated backgrounds.
-
-Inspect the existing:
-
-* `SecureNetIntro.jsx`
-* `SecureNetIntro.css`
-* `IntroProgress`
-* `IntroSpeech`
-
-If one of them already creates a full-screen opaque background that would completely hide the dots, adjust only the necessary background transparency/layering.
-
-Do not remove the tactical styling unnecessarily.
-
-12. Desired visual hierarchy:
-
-```text
-FULL SCREEN
-┌─────────────────────────────────────────────┐
-│  ·   ·    ·     ·    ·    ·     ·          │
-│      ·   ·    ·    ·      ·                 │
-│                                             │
-│                 SECURENET                   │
-│            DEFENCE COMMUNICATIONS          │
-│                                             │
-│          ┌──────────────────────┐           │
-│          │ INITIALIZING ...     │           │
-│          │ AUTHENTICATION READY │           │
-│          │ KEY EXCHANGE READY   │           │
-│          │ ENCRYPTION READY     │           │
-│          └──────────────────────┘           │
-│                                             │
-│          INITIALIZE SECURE CHANNEL         │
-│                                             │
-│                 SKIP INTRO                  │
-│                                             │
-│    ·       ·      ·      ·       ·         │
-└─────────────────────────────────────────────┘
-```
-
-The dots are a background FIELD extending behind the whole composition.
-
-13. The final appearance should be subtle and premium:
-
-* dark tactical command-center atmosphere
-* sparse animated dot field
-* content remains the visual focus
-* movement is noticeable but not distracting
-* no giant grid lines
-* no radar ring
-* no scanline recreation
-* no fake "GRID RECONSTRUCTION" text
-* no additional boot HUD
-
-14. Keep the code modular.
-
-Prefer:
-
-```text
-components/intro/
-    SecureNetIntro.jsx
-    SecureNetIntro.css
-    IntroProgress.jsx
-    IntroSpeech.jsx
-```
-
-Add a separate reusable DotGrid wrapper/component only if useful, for example:
-
-```text
-components/backgrounds/DotGrid.jsx
-components/backgrounds/DotGrid.css
-```
-
-Do not dump the DotGrid implementation directly into `SecureNetIntro.jsx` if it makes the component unnecessarily large.
-
-15. Verify the result specifically against the current screenshot:
-
-* Dot Grid fills the whole viewport.
-* Dots are visible behind the SecureNet content.
-* Text does NOT disappear into the dots.
-* Buttons remain clickable.
-* Voice control remains clickable.
-* No extra panel is created.
-* No fake radar effect appears.
-* Existing intro spacing/layout remains intact.
-* Existing Home/GridDistortion behavior is untouched.
-
-Before editing, inspect the existing intro component and CSS and determine which element is currently responsible for the full-screen background and stacking context.
-
-Make the smallest clean change necessary.
-
-```
-
-One extra thing: **don't install `@gsap/react` just for this unless the actual DotGrid implementation requires it**. The basic GSAP package is sufficient for GSAP animations, and the official GSAP docs use `npm install gsap`. :contentReference[oaicite:2]{index=2}
-```
-
-[1]: https://shadcnregistry.com/react-bits/dotgrid-ts-css?utm_source=chatgpt.com "DotGrid – shadcn/ui Component by react-bits"
+                         PLAINTEXT
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │    Ed25519      │
+                    │  Authentication │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │      ECDH       │
+                    │  Key Agreement  │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │      HKDF       │
+                    │ Session-Key     │
+                    │   Derivation    │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │   RSA-OAEP      │
+                    │ Session-Key     │
+                    │    Wrapping     │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │   AES-256-GCM   │
+                    │   Encryption    │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │   Packet        │
+                    │   Signing       │
+                    │   Ed25519       │
+                    └────────┬────────┘
+                             │
+                             ▼
+                       TRANSMISSION
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │    Ed25519      │
+                    │    Signature    │
+                    │   Verification  │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │    RSA-OAEP     │
+                    │ Session-Key     │
+                    │    Recovery     │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │   AES-256-GCM   │
+                    │   Decryption    │
+                    └────────┬────────┘
+                             │
+                             ▼
+                         PLAINTEXT
