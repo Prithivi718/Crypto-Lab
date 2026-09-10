@@ -1,0 +1,60 @@
+.team-overlay {
+  --team-dark: #4B5320;
+
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(43, 49, 10, 0.92);
+  backdrop-filter: blur(6px);
+  animation: team-overlay-fade 0.25s ease;
+  padding: 24px;
+}
+
+@keyframes team-overlay-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.team-overlay-panel {
+  position: relative;
+  width: 100%;
+  max-width: 1000px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background-color: #0e1203;
+  border: 1px solid var(--team-dark);
+  border-radius: 16px;
+  animation: team-panel-in 0.3s ease;
+}
+
+@keyframes team-panel-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.team-overlay-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  line-height: 1;
+  color: #AEB3B8;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 2;
+  transition: all 0.15s ease;
+}
+
+.team-overlay-close:hover { color: #ffffff; background-color: rgba(255, 255, 255, 0.14); }
+
+@media (max-width: 640px) {
+  .team-overlay { padding: 0; }
+  .team-overlay-panel { max-height: 100vh; border-radius: 0; }
+}
