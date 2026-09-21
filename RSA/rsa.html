@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RSA Algorithm</title>
+</head>
+<body>
+
+<h2>RSA Algorithm</h2>
+
+<label>Enter p:</label>
+<input type="number" id="p" value="61"><br><br>
+
+<label>Enter q:</label>
+<input type="number" id="q" value="53"><br><br>
+
+<label>Enter Message:</label>
+<input type="text" id="msg" value="HELLO"><br><br>
+
+<button onclick="rsa()">Encrypt & Decrypt</button>
+
+<pre id="output"></pre>
+
+<script>
+
+function gcd(a, b) {
+    while (b != 0n) {
+        let t = b;
+        b = a % b;
+        a = t;
+    }
+    return a;
+}
+
+function modPow(a, b, m) {
+    let result = 1n;
+
+    while (b > 0n) {
+        if (b % 2n == 1n)
+            result = result * a % m;
+
+        a = a * a % m;
+        b = b / 2n;
+    }
+
+    return result;
+}
+
+function modInverse(e, phi) {
+    for (let d = 1n; d < phi; d++) {
+        if ((e * d) % phi == 1n)
+            return d;
+    }
+}
+
+function rsa() {
+
+    let p = BigInt(document.getElementById("p").value);
+    let q = BigInt(document.getElementById("q").value);
+    let msg = document.getElementById("msg").value;
+
+    // Key generation
+    let n = p * q;
+    let phi = (p - 1n) * (q - 1n);
+
+    let e = 3n;
+
+    while (gcd(e, phi) != 1n)
+        e += 2n;
+
+    let d = modInverse(e, phi);
+
+    // Encryption
+    let cipher = [];
+
+    for (let ch of msg) {
+        let m = BigInt(ch.charCodeAt(0));
+        cipher.push(modPow(m, e, n));
+    }
+
+    // Decryption
+    let plain = "";
+
+    for (let c of cipher) {
+        let m = modPow(c, d, n);
+        plain += String.fromCharCode(Number(m));
+    }
+
+    document.getElementById("output").textContent =
+        "n = " + n +
+        "\nφ(n) = " + phi +
+        "\ne = " + e +
+        "\nd = " + d +
+        "\n\nPublic Key  = (" + e + ", " + n + ")" +
+        "\nPrivate Key = (" + d + ", " + n + ")" +
+        "\n\nCipher Text = " + cipher.join(" ") +
+        "\nDecrypted Text = " + plain;
+}
+
+</script>
+
+</body>
+</html>
