@@ -209,17 +209,15 @@ export const executeStep = async (workflowId, requestedStep) => {
                 );
                 durationMs = dMs;
 
+                const { salt, hkdfInfo } = sessionKey;
                 state.stepData.sessionKey = sessionKey;
-
-                const salt = '9e410000000000000000000000000000';
-                const hkdfInfo = '7365637572656e65742d73657373696f6e';
 
                 updateExecution(state.executionId, {
                     cryptographicMaterial: {
                         hkdf: {
                             salt,
                             hkdfInfo,
-                            sessionKey: sessionKey.toString('hex')
+                            sessionKey: Buffer.from(sessionKey).toString('hex')
                         }
                     },
                     measurements: {

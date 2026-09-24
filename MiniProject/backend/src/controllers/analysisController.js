@@ -1,5 +1,5 @@
 // analysisController.js
-import { generateReport, generateReportFile } from '../services/report.service.js';
+import { generateReport, generateReportData, generateReportFile } from '../services/report.service.js';
 import { successResponse, errorResponse } from '../utils/responseUtils.js';
 
 export const getReport = async (req, res) => {
@@ -10,7 +10,7 @@ export const getReport = async (req, res) => {
             return errorResponse(res, 'Execution ID is required', 'MISSING_EXECUTION_ID', 400);
         }
 
-        const report = generateReport(executionId);
+        const report = generateReportData(executionId);
 
         return successResponse(
             res,

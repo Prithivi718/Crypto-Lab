@@ -22,218 +22,305 @@ export const generateReportData = (executionId) => {
         throw new Error(`Execution Context not found for ID: ${executionId}`);
     }
 
-    // Analyze execution measurements using benchmark service
     const benchmarkAnalysis = analyzeExecution(execution);
-
     const rawInput = execution.input || {};
     const mat = execution.cryptographicMaterial || {};
     const verif = execution.verification || {};
-    const times = execution.measurements?.times || {};
-    const sizes = execution.measurements?.sizes || {};
 
-    const plaintext = rawInput.message || '';
-    const filename = rawInput.filename || 'mission.txt';
-    const inputSize = rawInput.size || (plaintext ? Buffer.byteLength(plaintext) : 0);
-
-    // Build unmasked steps 1-9 details
-    const steps = [
+    const encryptionSteps = [
         {
             step: 1,
             phase: 'encryption',
             algorithm: 'Ed25519',
             title: '01 / ED25519 AUTHENTICATION',
-            description: 'Sender Ed25519 signing key pair generation.',
-            durationMs: times.ed25519Gen || 0,
-            status: 'passed',
-            input: { description: 'Sender identity initialization (BASE-A)' },
+            input: {
+                description: 'Sender identity initialization (BASE-A)'
+            },
+            process: {
+                description: 'Generate Ed25519 signing key pair for digital signature verification.'
+            },
             output: {
-                edPublicKey: mat.ed25519?.edPublicKey || '',
-                edPrivateKey: mat.ed25519?.edPrivateKey || ''
-            }
+                publicKey: mat.ed25519?.edPublicKey || ''
+            },
+            status: 'passed'
         },
+
         {
             step: 2,
             phase: 'encryption',
             algorithm: 'ECDH',
             title: '02 / ECDH KEY EXCHANGE',
-            description: 'Independent Curve25519 ECDH key agreement to derive shared secret.',
-            durationMs: times.ecdhExchange || 0,
-            status: 'passed',
-            input: { description: 'Endpoint A and Endpoint B public/private key pairs' },
+            input: {
+                description: 'Endpoint A and Endpoint B public/private key pairs'
+            },
+            process: {
+                description: 'Both endpoints independently perform ECDH key agreement to compute shared secret.'
+            },
             output: {
                 baseAPublicKey: mat.ecdh?.baseAPublicKey || '',
                 baseBPublicKey: mat.ecdh?.baseBPublicKey || '',
-                sharedSecret: mat.ecdh?.sharedSecret || '',
-                sharedSecretsMatch: verif.sharedSecretsMatch !== undefined ? verif.sharedSecretsMatch : true
-            }
+                sharedSecret: mat.ecdh?.sharedSecret || ''
+            },
+            status: 'passed'
         },
+
         {
             step: 3,
             phase: 'encryption',
             algorithm: 'HKDF',
             title: '03 / HKDF KEY DERIVATION',
-            description: 'Derive 256-bit AES session key using HMAC-SHA256 Key Derivation Function.',
-            durationMs: times.hkdfDerivation || 0,
-            status: 'passed',
-            input: { description: 'ECDH shared secret' },
+            input: {
+                description: 'ECDH shared secret'
+            },
+            process: {
+                description: 'Derive 256-bit AES session key using HMAC Key Derivation Function (HKDF).'
+            },
             output: {
-                salt: mat.hkdf?.salt || '9e410000000000000000000000000000',
-                info: mat.hkdf?.hkdfInfo || '7365637572656e65742d73657373696f6e',
-                sessionKey: mat.hkdf?.sessionKey || mat.aes?.sessionKey || '',
-                sessionKeyLengthBytes: sizes.sessionKey || 32
-            }
+                salt: mat.hkdf?.salt,
+                info: mat.hkdf?.hkdfInfo,
+                sessionKey: mat.hkdf?.sessionKey || mat.aes?.sessionKey || ''
+            },
+            status: 'passed'
         },
+
         {
             step: 4,
             phase: 'encryption',
             algorithm: 'RSA-OAEP',
             title: '04 / RSA-OAEP KEY PROTECTION',
-            description: 'Wrap AES session key using receiver 2048-bit RSA-OAEP public key.',
-            durationMs: (times.rsaGen || 0) + (times.rsaWrap || 0),
-            status: 'passed',
-            input: { description: 'AES session key + receiver RSA public key' },
+            input: {
+                description: 'AES session key'
+            },
+            process: {
+                description: 'Wrap the session key using receiver RSA public key (2048-bit RSA-OAEP).'
+            },
             output: {
                 rsaPublicKey: mat.rsa?.rsaPublicKey || '',
-                rsaPrivateKey: mat.rsa?.rsaPrivateKey || '',
-                wrappedSessionKey: mat.rsa?.wrappedSessionKey || '',
-                wrappedSessionKeySizeBytes: sizes.wrappedSessionKey || 256
-            }
+                wrappedSessionKey: mat.rsa?.wrappedSessionKey || ''
+            },
+            status: 'passed'
         },
+
         {
             step: 5,
             phase: 'encryption',
             algorithm: 'AES-256-GCM',
-            title: '05 / AES-256-GCM MESSAGE ENCRYPTION',
-            description: 'Encrypt mission plaintext using AES-256-GCM authenticated encryption.',
-            durationMs: times.aesEncryption || 0,
-            status: 'passed',
-            input: { plaintext, sessionKey: mat.aes?.sessionKey || '' },
+            title: '05 / AES-256-GCM ENCRYPTION',
+            input: {
+                plaintext: rawInput.message || '',
+                sessionKey: mat.aes?.sessionKey || ''
+            },
+            process: {
+                description: 'Encrypt plaintext using AES-256-GCM authenticated encryption.'
+            },
             output: {
                 ciphertext: mat.aes?.ciphertext || '',
                 iv: mat.aes?.iv || '',
-                authTag: mat.aes?.authTag || '',
-                ciphertextSizeBytes: sizes.ciphertext || 0,
-                ivSizeBytes: sizes.iv || 12,
-                authTagSizeBytes: sizes.authTag || 16
-            }
+                authTag: mat.aes?.authTag || ''
+            },
+            status: 'passed'
         },
+
         {
             step: 6,
             phase: 'encryption',
             algorithm: 'Ed25519',
             title: '06 / PACKET SIGNING',
-            description: 'Assemble secure transmission payload and sign with sender Ed25519 private key.',
-            durationMs: times.ed25519Sign || 0,
-            status: 'passed',
-            input: { description: 'Assembled secure payload (senderId, ecdhPublicKey, wrappedSessionKey, ciphertext, iv, authTag)' },
+            input: {
+                description: 'Assembled secure payload'
+            },
+            process: {
+                description: 'Sign packet using sender Ed25519 private key.'
+            },
             output: {
-                signature: mat.signature?.signature || '',
-                signatureSizeBytes: sizes.signature || 64
-            }
-        },
+                signature: mat.signature?.signature || ''
+            },
+            status: 'passed'
+        }
+    ];
+
+    const decryptionSteps = [
         {
             step: 7,
             phase: 'decryption',
             algorithm: 'Ed25519',
             title: '07 / SIGNATURE VERIFICATION',
-            description: 'Verify packet digital signature using sender Ed25519 public key.',
-            durationMs: times.ed25519Verify || 0,
-            status: 'passed',
-            input: { description: 'Received secure packet + Ed25519 signature' },
+            input: {
+                description: 'Received secure packet + Ed25519 signature'
+            },
+            process: {
+                description: 'Verify packet digital signature using sender Ed25519 public key.'
+            },
             output: {
-                signatureValid: verif.signatureValid !== undefined ? verif.signatureValid : true
-            }
+                signatureValid:
+                    verif.signatureValid !== undefined
+                        ? verif.signatureValid
+                        : true
+            },
+            status: 'passed'
         },
+
         {
             step: 8,
             phase: 'decryption',
             algorithm: 'RSA-OAEP',
             title: '08 / RSA SESSION KEY RECOVERY',
-            description: 'Unwrap and recover AES session key using receiver RSA-OAEP private key.',
-            durationMs: times.rsaUnwrap || 0,
-            status: 'passed',
-            input: { description: 'Wrapped session key + receiver RSA private key' },
+            input: {
+                description: 'Wrapped session key + receiver RSA private key'
+            },
+            process: {
+                description: 'Recover AES session key using receiver RSA-OAEP private key.'
+            },
             output: {
-                recoveredSessionKey: mat.rsa?.recoveredSessionKey || mat.aes?.sessionKey || ''
-            }
+                recoveredSessionKey:
+                    mat.rsa?.recoveredSessionKey ||
+                    mat.aes?.sessionKey ||
+                    ''
+            },
+            status: 'passed'
         },
+
         {
             step: 9,
             phase: 'decryption',
             algorithm: 'AES-256-GCM',
             title: '09 / AES-256-GCM DECRYPTION',
-            description: 'Decrypt ciphertext using recovered session key and verify authentication tag.',
-            durationMs: times.aesDecryption || 0,
-            status: 'passed',
             input: {
                 ciphertext: mat.aes?.ciphertext || '',
-                recoveredSessionKey: mat.rsa?.recoveredSessionKey || mat.aes?.sessionKey || '',
+                recoveredSessionKey:
+                    mat.rsa?.recoveredSessionKey ||
+                    mat.aes?.sessionKey ||
+                    '',
                 iv: mat.aes?.iv || '',
                 authTag: mat.aes?.authTag || ''
             },
+            process: {
+                description: 'Decrypt ciphertext and validate authentication tag.'
+            },
             output: {
-                decryptedPlaintext: execution.process?.decryption?.plaintext || plaintext,
-                decryptionSuccess: verif.decryptionSuccess !== undefined ? verif.decryptionSuccess : true,
-                plaintextMatch: verif.plaintextMatch !== undefined ? verif.plaintextMatch : true
-            }
+                sessionKey:
+                    mat.rsa?.recoveredSessionKey ||
+                    mat.aes?.sessionKey ||
+                    '',
+                plaintext:
+                    execution.process?.decryption?.plaintext ||
+                    rawInput.message ||
+                    ''
+            },
+            status: 'passed'
         }
     ];
 
-    return {
+    const cryptographicMaterialDisplay = {
+        ed25519: {
+            edPublicKey: mat.ed25519?.edPublicKey || '',
+            edPrivateKey: mat.ed25519?.edPrivateKey || ''
+        },
+
+        ecdh: {
+            baseAPublicKey: mat.ecdh?.baseAPublicKey || '',
+            baseBPublicKey: mat.ecdh?.baseBPublicKey || '',
+            sharedSecret: mat.ecdh?.sharedSecret || ''
+        },
+
+        hkdf: {
+            salt: mat.hkdf?.salt,
+            info: mat.hkdf?.hkdfInfo,
+
+            sessionKey:
+                mat.hkdf?.sessionKey ||
+                mat.aes?.sessionKey ||
+                ''
+        },
+
+        rsa: {
+            rsaPublicKey: mat.rsa?.rsaPublicKey || '',
+            rsaPrivateKey: mat.rsa?.rsaPrivateKey || '',
+            wrappedSessionKey: mat.rsa?.wrappedSessionKey || '',
+            recoveredSessionKey: mat.rsa?.recoveredSessionKey || ''
+        },
+
+        aes: {
+            sessionKey: mat.aes?.sessionKey || '',
+            ciphertext: mat.aes?.ciphertext || '',
+            iv: mat.aes?.iv || '',
+            authTag: mat.aes?.authTag || ''
+        },
+
+        signature: {
+            signature: mat.signature?.signature || ''
+        }
+    };
+
+    const report = {
         summary: {
             executionId: execution.executionId,
-            filename,
-            inputSize,
+            filename: rawInput.filename || 'mission.txt',
+            inputSize: rawInput.size || 0,
             status: execution.status,
             createdAt: execution.createdAt,
             completedAt: execution.completedAt
         },
+
         input: {
-            plaintext,
-            filename,
-            size: inputSize
+            plaintext: rawInput.message || '',
+            filename: rawInput.filename || 'mission.txt',
+            size: rawInput.size || 0
         },
-        steps,
-        cryptographicMaterial: {
-            ed25519: {
-                edPublicKey: mat.ed25519?.edPublicKey || '',
-                edPrivateKey: mat.ed25519?.edPrivateKey || ''
-            },
-            ecdh: {
-                baseAPublicKey: mat.ecdh?.baseAPublicKey || '',
-                baseBPublicKey: mat.ecdh?.baseBPublicKey || '',
-                sharedSecret: mat.ecdh?.sharedSecret || ''
-            },
-            hkdf: {
-                salt: mat.hkdf?.salt || '9e410000000000000000000000000000',
-                info: mat.hkdf?.hkdfInfo || '7365637572656e65742d73657373696f6e',
-                sessionKey: mat.hkdf?.sessionKey || mat.aes?.sessionKey || ''
-            },
-            rsa: {
-                rsaPublicKey: mat.rsa?.rsaPublicKey || '',
-                rsaPrivateKey: mat.rsa?.rsaPrivateKey || '',
-                wrappedSessionKey: mat.rsa?.wrappedSessionKey || '',
-                recoveredSessionKey: mat.rsa?.recoveredSessionKey || ''
-            },
-            aes: {
-                sessionKey: mat.aes?.sessionKey || '',
-                ciphertext: mat.aes?.ciphertext || '',
-                iv: mat.aes?.iv || '',
-                authTag: mat.aes?.authTag || ''
-            },
-            signature: {
-                signature: mat.signature?.signature || ''
-            }
+
+        encryption: encryptionSteps,
+
+        decryption: decryptionSteps,
+
+        cryptographicMaterial: cryptographicMaterialDisplay,
+
+        packet: {
+            senderId: 'BASE-A',
+            ecdhPublicKey: mat.ecdh?.baseAPublicKey || '',
+            wrappedSessionKey: mat.rsa?.wrappedSessionKey || '',
+            ciphertext: mat.aes?.ciphertext || '',
+            iv: mat.aes?.iv || '',
+            authTag: mat.aes?.authTag || '',
+            signature: mat.signature?.signature || ''
         },
+
         verification: {
-            sharedSecretsMatch: verif.sharedSecretsMatch !== undefined ? verif.sharedSecretsMatch : (execution.status === 'completed'),
-            signatureValid: verif.signatureValid !== undefined ? verif.signatureValid : (execution.status === 'completed'),
-            decryptionSuccess: verif.decryptionSuccess !== undefined ? verif.decryptionSuccess : (execution.status === 'completed'),
-            plaintextMatch: verif.plaintextMatch !== undefined ? verif.plaintextMatch : (execution.status === 'completed'),
-            finalStatus: execution.status === 'completed' ? 'TRANSMISSION VERIFIED' : 'TRANSMISSION FAILED'
+            sharedSecretsMatch:
+                verif.sharedSecretsMatch !== undefined
+                    ? verif.sharedSecretsMatch
+                    : execution.status === 'completed',
+
+            signatureValid:
+                verif.signatureValid !== undefined
+                    ? verif.signatureValid
+                    : execution.status === 'completed',
+
+            decryptionSuccess:
+                verif.decryptionSuccess !== undefined
+                    ? verif.decryptionSuccess
+                    : execution.status === 'completed',
+
+            plaintextMatch:
+                verif.plaintextMatch !== undefined
+                    ? verif.plaintextMatch
+                    : execution.status === 'completed',
+
+            finalStatus:
+                execution.status === 'completed'
+                    ? 'TRANSMISSION VERIFIED'
+                    : 'TRANSMISSION FAILED'
         },
-        benchmark: benchmarkAnalysis
+
+        benchmark: benchmarkAnalysis,
+
+        finalResult: {
+            success: execution.status === 'completed'
+        }
     };
+
+    execution.report = report;
+
+    return report;
 };
 
 /**

@@ -31,12 +31,12 @@ export const generateSessionKey = async (sharedKey) => {
         // CONFIG of HKDF
         // salt value
         const salt = new TextEncoder().encode(
-            "SecureDefenceNetwork-Salt"
+            "SecureDefenceFramework-Salt"
         );
 
         // info useful for Session key generation
         const info = new TextEncoder().encode(
-            "AES-256-GCM-Session-Key"
+            "AES-256-GCM-Sessionss-Keeys"
         );
 
 
@@ -58,7 +58,11 @@ export const generateSessionKey = async (sharedKey) => {
             throw new Error("Value generation is failed!");
         }
 
-        return sessionKey;
+        return {
+            salt: Buffer.from(salt).toString("hex"),
+            info: Buffer.from(info).toString("hex"),
+            sessionKey: sessionKey
+        };
 
     } catch (error) {
         console.error("Error:", error.message);

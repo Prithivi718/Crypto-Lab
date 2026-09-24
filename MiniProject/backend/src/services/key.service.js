@@ -23,8 +23,8 @@ import {
 } from "../crypto/rsa.js";
 
 import {
-    generateSessionKey
-} from "../crypto/hkdf.js";
+    deriveSessionKey as deriveCryptoSessionKey
+} from "./crypto.service.js";
 
 
 // ============================================================
@@ -266,7 +266,7 @@ export const deriveSessionKey = async (
         }
 
         const sessionKey =
-            await generateSessionKey(sharedSecret);
+            await deriveCryptoSessionKey(sharedSecret);
 
         return sessionKey;
 

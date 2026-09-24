@@ -137,7 +137,9 @@ export const deriveSessionKey = async (sharedSecret) => {
         throw new Error("Missing arguement is required");
     }
 
-    const sessionKey = await generateSessionKey(sharedSecret);
+    const { salt, info, sessionKey } = await generateSessionKey(sharedSecret);
+    sessionKey.salt = salt;
+    sessionKey.hkdfInfo = info;
     return sessionKey;
 };
 

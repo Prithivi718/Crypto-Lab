@@ -183,7 +183,9 @@ export const process_run = async (message, metadata = {}) => {
                     sharedSecret: baseASharedSecret.toString('hex')
                 },
                 hkdf: {
-                    sessionKey: sessionKey.toString('hex')
+                    salt: sessionKey.salt,
+                    hkdfInfo: sessionKey.hkdfInfo,
+                    sessionKey: Buffer.from(sessionKey).toString('hex')
                 },
                 rsa: {
                     rsaPublicKey: rsaPublicKey.toString('hex'),
